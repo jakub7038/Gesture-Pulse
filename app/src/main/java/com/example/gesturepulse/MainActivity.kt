@@ -20,41 +20,60 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.gesturepulse.ui.theme.GesturePulseTheme
-import androidx.compose.ui.graphics.Color
-
 
 class MainActivity : ComponentActivity() {
+    private lateinit var sensorHandler: SensorHandler
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        sensorHandler = SensorHandler(applicationContext)
+
         enableEdgeToEdge()
         setContent {
             GesturePulseTheme {
-//                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-//                    Greeting(
-//                        name = "Android",
-//                        modifier = Modifier.padding(innerPadding)
-//                    )
-//                }
-//                raczej nie bede potrzebowac paska cofania
-
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainMenuScreen()
+                    val navController = rememberNavController()
+
+                    NavHost(navController = navController, startDestination = "menu") {
+                        // --- Menu ---
+                        composable("menu") {
+                            MainMenuScreen(navController = navController)
+                        }
+                        // --- Nagrywanie ---
+                        composable("record_gesture") {
+                            GestureRecordingScreen(
+                                navController = navController,
+                                sensorHandler = sensorHandler // Przekaż ten sam handler
+                            )
+                        }
+                        // --- TODO: Ekran Gry ---
+                    }
                 }
             }
         }
     }
 }
 
+/**
+ * Ekran Menu Głównego
+ * Zaktualizowano, aby przyjmował NavController
+ */
 @Composable
-fun MainMenuScreen(modifier: Modifier = Modifier) {
+fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -65,7 +84,16 @@ fun MainMenuScreen(modifier: Modifier = Modifier) {
 
         MenuButton(
             text = "Graj",
-            onClick = { /* TODO: logika */ }
+            onClick = { /* TODO: navController.navigate("game") */ }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        MenuButton(
+            text = "Nagraj swój gest",
+            onClick = {
+                navController.navigate("record_gesture")
+            }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -117,10 +145,12 @@ fun MenuButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier)
     }
 }
 
+
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
     GesturePulseTheme {
-        MainMenuScreen()
+        val navController = rememberNavController()
+        MainMenuScreen(navController = navController)
     }
 }
