@@ -32,6 +32,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.gesturepulse.ui.theme.GesturePulseTheme
+import com.example.gesturepulse.RankingScreen
 
 class MainActivity : ComponentActivity() {
     private lateinit var sensorHandler: SensorHandler
@@ -91,6 +92,11 @@ class MainActivity : ComponentActivity() {
                                 sensorHandler = sensorHandler
                             )
                         }
+
+                        // --- EKRAN RANKINGU ---
+                        composable("rankings") {
+                            RankingScreen(navController = navController)
+                        }
                     }
                 }
             }
@@ -135,7 +141,7 @@ fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) 
 
         MenuButton(
             text = "Rankingi",
-            onClick = { /* TODO: logika */ }
+            onClick = { navController.navigate("rankings") } // <-- ZMIANA TUTAJ
         )
 
         Spacer(modifier = Modifier.height(16.dp))

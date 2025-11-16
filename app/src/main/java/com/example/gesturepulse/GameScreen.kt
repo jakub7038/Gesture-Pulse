@@ -14,9 +14,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -39,8 +41,9 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import com.example.gesturepulse.ScoreDataManager
+import com.example.gesturepulse.ScoreEntry
 
-// --- ZMIANA W STANACH GRY ---
 private sealed class GameState {
     object Idle : GameState()
     data class ShowingCommand(val command: Command) : GameState()
@@ -67,6 +70,9 @@ fun GameScreen(navController: NavController, sensorHandler: SensorHandler) {
 
     var countdownTimer by remember { mutableFloatStateOf(0f) }
     var totalDurationMs by remember { mutableLongStateOf(1L) }
+
+    var showSaveScoreDialog by remember { mutableStateOf(false) }
+    var scoreSaved by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val loadedGestures = GestureDataManager.loadAllGestures(context)
@@ -170,6 +176,46 @@ fun GameScreen(navController: NavController, sensorHandler: SensorHandler) {
         }
     }
 
+    // --- DIALOG ZAPISU WYNIKU ---
+    if (showSaveScoreDialog) {
+        var playerName by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showSaveScoreDialog = false },
+            title = { Text("Zapisz Swój Wynik") },
+            text = {
+                Column {
+                    Text("Gratulacje! Twój wynik: $score")
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = playerName,
+                        onValueChange = { playerName = it },
+                        label = { Text("Wpisz swoje imię") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (playerName.isNotBlank()) {
+                            ScoreDataManager.addScore(context, ScoreEntry(playerName.trim(), score))
+                            scoreSaved = true
+                            showSaveScoreDialog = false
+                        }
+                    },
+                    enabled = playerName.isNotBlank()
+                ) {
+                    Text("Zapisz")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showSaveScoreDialog = false }) {
+                    Text("Anuluj")
+                }
+            }
+        )
+    }
+
 
     // --- INTERFEJS UŻYTKOWNIKA ---
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -187,10 +233,19 @@ fun GameScreen(navController: NavController, sensorHandler: SensorHandler) {
                 Spacer(Modifier.height(32.dp))
                 Button(onClick = {
                     score = 0
+                    scoreSaved = false // Resetuj flagę zapisu
                     gameState = GameState.Idle
                     currentCommandText = "Naciśnij Start"
                 }) {
                     Text("Zagraj Ponownie")
+                }
+                Spacer(Modifier.height(8.dp))
+                // --- PRZYCISK ZAPISU ---
+                Button(
+                    onClick = { showSaveScoreDialog = true },
+                    enabled = !scoreSaved // Wyłącz, jeśli już zapisano
+                ) {
+                    Text(if (scoreSaved) "Wynik Zapisany" else "Zapisz Wynik")
                 }
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = { navController.popBackStack() }) {
