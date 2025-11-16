@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // --- ista Gestów ---
+                        // --- Lista Gestów ---
                         composable("gesture_list") {
                             // Ta funkcja jest teraz wczytywana z nowego pliku
                             GestureListScreen(navController = navController)
@@ -84,7 +84,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // --- TODO: Ekran Gry ---
+                        // --- Ekranu Gry ---
+                        composable("game") {
+                            GameScreen(
+                                navController = navController,
+                                sensorHandler = sensorHandler
+                            )
+                        }
                     }
                 }
             }
@@ -104,7 +110,7 @@ fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) 
 
         MenuButton(
             text = "Graj",
-            onClick = { /* TODO: navController.navigate("game") */ }
+            onClick = { navController.navigate("game") } // Usunięto TODO
         )
 
         Spacer(modifier = Modifier.height(16.dp))
