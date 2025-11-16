@@ -26,9 +26,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.gesturepulse.ui.theme.GesturePulseTheme
 
 class MainActivity : ComponentActivity() {
@@ -53,13 +55,35 @@ class MainActivity : ComponentActivity() {
                         composable("menu") {
                             MainMenuScreen(navController = navController)
                         }
+
                         // --- Nagrywanie ---
                         composable("record_gesture") {
                             GestureRecordingScreen(
                                 navController = navController,
-                                sensorHandler = sensorHandler // Przekaż ten sam handler
+                                sensorHandler = sensorHandler
                             )
                         }
+
+                        // --- ista Gestów ---
+                        composable("gesture_list") {
+                            // Ta funkcja jest teraz wczytywana z nowego pliku
+                            GestureListScreen(navController = navController)
+                        }
+
+                        // --- Edytor ---
+                        composable(
+                            route = "editor/{gestureName}",
+                            arguments = listOf(
+                                navArgument("gestureName") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val gestureName = backStackEntry.arguments?.getString("gestureName") ?: ""
+                            GestureEditorScreen(
+                                navController = navController,
+                                gestureName = gestureName
+                            )
+                        }
+
                         // --- TODO: Ekran Gry ---
                     }
                 }
@@ -68,10 +92,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Ekran Menu Głównego
- * Zaktualizowano, aby przyjmował NavController
- */
 @Composable
 fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) {
     Column(
@@ -99,6 +119,15 @@ fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) 
         Spacer(modifier = Modifier.height(16.dp))
 
         MenuButton(
+            text = "Moje Gesty",
+            onClick = {
+                navController.navigate("gesture_list")
+            }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        MenuButton(
             text = "Rankingi",
             onClick = { /* TODO: logika */ }
         )
@@ -109,7 +138,6 @@ fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) 
             text = "Ustawienia",
             onClick = { /* TODO: logika */ }
         )
-
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -144,7 +172,6 @@ fun MenuButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier)
         Text(text, fontSize = 20.sp, fontWeight = fontWeight)
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable

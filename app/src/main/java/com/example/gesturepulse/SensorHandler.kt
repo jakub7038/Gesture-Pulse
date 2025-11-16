@@ -5,87 +5,97 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import kotlinx.serialization.Serializable
-
-/**
- * Definicja pojedynczej próbki danych z sensora.
- */
-@Serializable
-data class SensorData(
-    val timestamp: Long,
-    val x: Float,
-    val y: Float,
-    val z: Float
-)
+import android.util.Log
 
 /**
  * Wspólny handler do zarządzania SensorManagerem.
  * Odpowiada za rejestrowanie, wyrejestrowywanie i przekazywanie danych
- * z akcelerometru.
+ * z akcelerometru ORAZ żyroskopu.
  */
 class SensorHandler(context: Context) {
 
-    // Prywatna funkcja callback, wywoływana przy każdej zmianie danych
-    private var dataCallback: ((SensorData) -> Unit)? = null
+    // Oddzielne callbacki dla każdego sensora
+    private var accelCallback: ((SensorSample) -> Unit)? = null
+    private var gyroCallback: ((SensorSample) -> Unit)? = null
 
-    // Manager systemowy sensorów
     private val sensorManager =
         context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
-    // Domyślny sensor akcelerometru
+    // Dwa sensory
     private val accelerometer: Sensor? =
         sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+    private val gyroscope: Sensor? =
+        sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
-    // TODO: Dodaj tu inne sensory (Żyroskop, Zbliżeniowy)
-    // private val gyroscope: Sensor? = ...
-    // private val proximity: Sensor? = ...
+    // TODO: Dodaj tu Czujnik Zbliżeniowy (TYPE_PROXIMITY)
 
     private val sensorListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
-            // Sprawdzamy, czy mamy callback i czy dane są z akcelerometru
-            if (dataCallback != null && event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
-                val sensorData = SensorData(
-                    timestamp = event.timestamp,
-                    x = event.values[0],
-                    y = event.values[1],
-                    z = event.values[2]
-                )
-                // Wywołaj callback z nowymi danymi
-                dataCallback?.invoke(sensorData)
+            // Kieruj dane do odpowiedniego callbacku
+            when (event?.sensor?.type) {
+                Sensor.TYPE_ACCELEROMETER -> {
+                    accelCallback?.invoke(
+                        SensorSample(
+                            timestamp = event.timestamp,
+                            x = event.values[0],
+                            y = event.values[1],
+                            z = event.values[2]
+                        )
+                    )
+                }
+                Sensor.TYPE_GYROSCOPE -> {
+                    gyroCallback?.invoke(
+                        SensorSample(
+                            timestamp = event.timestamp,
+                            x = event.values[0],
+                            y = event.values[1],
+                            z = event.values[2]
+                        )
+                    )
+                }
             }
-
-            // TODO: Obsłuż tu dane z innych sensorów (np. żyroskopu)
-            // if (dataCallback != null && event?.sensor?.type == Sensor.TYPE_GYROSCOPE) { ... }
         }
 
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-            // Ignorujemy w tej implementacji
+            // Ignorujemy
         }
     }
 
     /**
-     * Rozpoczyna nasłuchiwanie i ustawia funkcję zwrotną (callback).
+     * Rozpoczyna nasłuchiwanie i ustawia funkcje zwrotne (callbacki).
      */
-    fun startListening(onData: (SensorData) -> Unit) {
-        if (accelerometer == null) {
-            // TODO: Obsłuż brak akcelerometru w telefonie
-            return
-        }
-        dataCallback = onData
-        // Rejestrujemy listener
-        sensorManager.registerListener(
-            sensorListener,
-            accelerometer,
-            SensorManager.SENSOR_DELAY_GAME // Szybka częstotliwość dla gry
-        )
-        // TODO: Zarejestruj tu inne sensory...
+    fun startListening(
+        onAccel: (SensorSample) -> Unit,
+        onGyro: (SensorSample) -> Unit
+    ) {
+        // Ustaw callbacki
+        accelCallback = onAccel
+        gyroCallback = onGyro
+
+        // Zarejestruj oba sensory
+        accelerometer?.let {
+            sensorManager.registerListener(
+                sensorListener,
+                it,
+                SensorManager.SENSOR_DELAY_GAME
+            )
+        } ?: Log.w("SensorHandler", "Akcelerometr niedostępny!")
+
+        gyroscope?.let {
+            sensorManager.registerListener(
+                sensorListener,
+                it,
+                SensorManager.SENSOR_DELAY_GAME
+            )
+        } ?: Log.w("SensorHandler", "Żyroskop niedostępny!")
     }
 
     /**
-     * Kończy nasłuchiwanie i czyści callback, aby uniknąć wycieków pamięci.
+     * Kończy nasłuchiwanie i czyści callbacki.
      */
     fun stopListening() {
-        dataCallback = null
+        accelCallback = null
+        gyroCallback = null
         sensorManager.unregisterListener(sensorListener)
     }
 }
