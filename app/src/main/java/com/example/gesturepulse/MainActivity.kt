@@ -32,7 +32,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.gesturepulse.ui.theme.GesturePulseTheme
-import com.example.gesturepulse.RankingScreen
 
 class MainActivity : ComponentActivity() {
     private lateinit var sensorHandler: SensorHandler
@@ -67,7 +66,6 @@ class MainActivity : ComponentActivity() {
 
                         // --- Lista Gestów ---
                         composable("gesture_list") {
-                            // Ta funkcja jest teraz wczytywana z nowego pliku
                             GestureListScreen(navController = navController)
                         }
 
@@ -93,9 +91,17 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // --- EKRAN RANKINGU ---
+                        // --- Rankingi ---
                         composable("rankings") {
                             RankingScreen(navController = navController)
+                        }
+
+                        // --- NOWY EKRAN: LABORATORIUM / TEST ---
+                        composable("gesture_test") {
+                            GestureTestScreen(
+                                navController = navController,
+                                sensorHandler = sensorHandler
+                            )
                         }
                     }
                 }
@@ -116,13 +122,21 @@ fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) 
 
         MenuButton(
             text = "Graj",
-            onClick = { navController.navigate("game") } // Usunięto TODO
+            onClick = { navController.navigate("game") }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- NOWY PRZYCISK ---
+        MenuButton(
+            text = "Laboratorium (Testuj Gesty)",
+            onClick = { navController.navigate("gesture_test") }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         MenuButton(
-            text = "Nagraj swój gest",
+            text = "Nagraj nowy gest",
             onClick = {
                 navController.navigate("record_gesture")
             }
@@ -131,7 +145,7 @@ fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) 
         Spacer(modifier = Modifier.height(16.dp))
 
         MenuButton(
-            text = "Moje Gesty",
+            text = "Zarządzaj Gestami",
             onClick = {
                 navController.navigate("gesture_list")
             }
@@ -141,21 +155,14 @@ fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) 
 
         MenuButton(
             text = "Rankingi",
-            onClick = { navController.navigate("rankings") } // <-- ZMIANA TUTAJ
+            onClick = { navController.navigate("rankings") }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         MenuButton(
-            text = "Ustawienia",
-            onClick = { /* TODO: logika */ }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        MenuButton(
-            text = "Exit",
-            onClick = { /* TODO: logika */ }
+            text = "Wyjdź",
+            onClick = { /* TODO: finish() activity logic */ }
         )
     }
 }
@@ -182,14 +189,5 @@ fun MenuButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier)
         colors = colors
     ) {
         Text(text, fontSize = 20.sp, fontWeight = fontWeight)
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    GesturePulseTheme {
-        val navController = rememberNavController()
-        MainMenuScreen(navController = navController)
     }
 }

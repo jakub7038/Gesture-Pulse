@@ -9,9 +9,6 @@ import java.io.File
 
 const val GESTURE_FILE_NAME = "my_gestures.json"
 
-/**
- * Definicja pojedynczej próbki danych z sensora.
- */
 @Serializable
 data class SensorSample(
     val timestamp: Long,
@@ -20,9 +17,6 @@ data class SensorSample(
     val z: Float
 )
 
-/**
- * Struktura danych dla gestu w pliku JSON.
- */
 @Serializable
 data class Gesture(
     val name: String,
@@ -30,16 +24,10 @@ data class Gesture(
     val gyroscopeData: List<SensorSample>
 )
 
-/**
- * Singleton do zarządzania wczytywaniem i zapisywaniem gestów do pliku JSON.
- */
 object GestureDataManager {
 
     private val json = Json { prettyPrint = true }
 
-    /**
-     * Wczytuje wszystkie gesty z pliku JSON.
-     */
     fun loadAllGestures(context: Context): MutableList<Gesture> {
         return try {
             val file = File(context.filesDir, GESTURE_FILE_NAME)
@@ -54,9 +42,6 @@ object GestureDataManager {
         }
     }
 
-    /**
-     * Zapisuje całą listę gestów do pliku, nadpisując jego zawartość.
-     */
     fun saveAllGestures(context: Context, gestures: List<Gesture>) {
         try {
             val file = File(context.filesDir, GESTURE_FILE_NAME)
@@ -68,9 +53,17 @@ object GestureDataManager {
     }
 
     /**
-     * funkcja do zapisywania pojedynczego, zaktualizowanego gestu.
+     * Dodaje nowy gest do listy (pozwala na duplikaty nazw - warianty).
      */
+    fun addGesture(context: Context, gesture: Gesture) {
+        val allGestures = loadAllGestures(context)
+        allGestures.add(gesture)
+        saveAllGestures(context, allGestures)
+    }
+
     fun updateGesture(context: Context, updatedGesture: Gesture) {
+        // Ta funkcja aktualizuje PIERWSZE wystąpienie o danej nazwie
+        // W modelu multi-sample rzadziej używana, ale zostawiamy dla edytora
         val allGestures = loadAllGestures(context)
         val index = allGestures.indexOfFirst { it.name == updatedGesture.name }
 
@@ -83,14 +76,12 @@ object GestureDataManager {
     }
 
     fun deleteGesture(context: Context, gestureName: String) {
+        // Usuwa WSZYSTKIE warianty o tej nazwie
         val allGestures = loadAllGestures(context)
-        val gestureToRemove = allGestures.find { it.name == gestureName }
+        val filtered = allGestures.filter { it.name != gestureName }
 
-        if (gestureToRemove != null) {
-            allGestures.remove(gestureToRemove)
-            saveAllGestures(context, allGestures)
-        } else {
-            Log.w("GestureDataManager", "Nie znaleziono gestu '$gestureName' do usunięcia.")
+        if (filtered.size != allGestures.size) {
+            saveAllGestures(context, filtered)
         }
     }
 }
