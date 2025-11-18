@@ -1,8 +1,22 @@
 package com.example.gesturepulse
 
-import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,7 +28,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -22,226 +35,346 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import kotlin.math.*
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GestureEditorScreen(navController: NavController, gestureName: String) {
+fun GestureEditorScreen(navController: NavController, gestureName: String, sensorHandler: SensorHandler) {
     val context = LocalContext.current
-    var isLoading by remember { mutableStateOf(true) }
-    var fullGesture by remember { mutableStateOf<Gesture?>(null) }
-    var startIndex by remember { mutableFloatStateOf(0f) }
-    var endIndex by remember { mutableFloatStateOf(100f) }
-    var maxIndex by remember { mutableFloatStateOf(100f) }
+
+    // dane
+    var variants by remember { mutableStateOf(listOf<Gesture>()) }
+    var currentThreshold by remember { mutableFloatStateOf(20.0f) }
+    var hasChanges by remember { mutableStateOf(false) }
+
+    // selekcja wariantów
+    var selectedVariantIndex by remember { mutableIntStateOf(0) }
+    var isChartExpanded by remember { mutableStateOf(true) }
+
+    // suwaki przycinania
+    var trimStartIndex by remember { mutableFloatStateOf(0f) }
+    var trimEndIndex by remember { mutableFloatStateOf(100f) }
+    var maxDataSize by remember { mutableFloatStateOf(100f) }
+
+    // tester TODO: coś z nim jest nie tak, ale szzcerze nie wiem co
+    var isRecordingTest by remember { mutableStateOf(false) }
+    var testStatusText by remember { mutableStateOf("Ustaw suwaki i przetestuj") }
+    var lastTestScore by remember { mutableDoubleStateOf(0.0) }
+    var lastTestSuccess by remember { mutableStateOf<Boolean?>(null) }
+    val liveAccel = remember { mutableStateListOf<SensorSample>() }
+    val liveGyro = remember { mutableStateListOf<SensorSample>() }
+
+    // odświeżanie danu wariantu
+    fun loadVariantData(gestures: List<Gesture>, index: Int) {
+        if (gestures.isNotEmpty()) {
+            val safeIndex = index.coerceIn(gestures.indices)
+            if (safeIndex != index) selectedVariantIndex = safeIndex
+
+            val g = gestures[safeIndex]
+            maxDataSize = g.accelerometerData.size.toFloat().coerceAtLeast(1f)
+            trimStartIndex = 0f
+            trimEndIndex = maxDataSize
+        }
+    }
 
     LaunchedEffect(gestureName) {
-        try {
-            val allGestures = GestureDataManager.loadAllGestures(context)
-            val gestureToEdit = allGestures.find { it.name == gestureName }
-            if (gestureToEdit != null) {
-                fullGesture = gestureToEdit
-                val dataSize = when {
-                    gestureToEdit.accelerometerData.isNotEmpty() -> gestureToEdit.accelerometerData.size
-                    gestureToEdit.gyroscopeData.isNotEmpty() -> gestureToEdit.gyroscopeData.size
-                    else -> 100
-                }
-                maxIndex = max(dataSize.toFloat(), 1f)
-                startIndex = 0f
-                endIndex = maxIndex
-            }
-            isLoading = false
-        } catch (e: Exception) {
-            Log.e("GestureEditor", "Błąd", e)
-            isLoading = false
+        val all = GestureDataManager.loadAllGestures(context)
+        variants = all.filter { it.name == gestureName }
+        if (variants.isNotEmpty()) {
+            currentThreshold = variants.first().threshold
+            loadVariantData(variants, 0)
         }
     }
 
-    if (isLoading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
+    LaunchedEffect(selectedVariantIndex) {
+        loadVariantData(variants, selectedVariantIndex)
     }
 
-    if (fullGesture == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Nie znaleziono gestu: $gestureName")
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = { navController.popBackStack() }) { Text("Wróć") }
-            }
+    DisposableEffect(isRecordingTest) {
+        if (isRecordingTest) {
+            liveAccel.clear()
+            liveGyro.clear()
+            sensorHandler.startListening(onAccel = { liveAccel.add(it) }, onGyro = { liveGyro.add(it) })
+            onDispose { sensorHandler.stopListening() }
+        } else {
+            onDispose { }
         }
-        return
     }
 
-    val accelData = fullGesture?.accelerometerData ?: emptyList()
-    val gyroData = fullGesture?.gyroscopeData ?: emptyList()
-
-    Column(Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Edytor Gestu: $gestureName", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            "Dane: ${accelData.size} akcelerometr, ${gyroData.size} żyroskop",
-            fontSize = 14.sp,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        if (accelData.isNotEmpty() || gyroData.isNotEmpty()) {
-            // Bezpośrednie wyświetlanie View2D
-            View2D(accelData, gyroData, startIndex.roundToInt(), endIndex.roundToInt(), Modifier.fillMaxWidth().height(300.dp))
-
-            Spacer(Modifier.height(16.dp))
-            Text("Początek: ${startIndex.roundToInt()}")
-            Slider(value = startIndex, onValueChange = { startIndex = it.coerceAtMost(endIndex - 1f) }, valueRange = 0f..maxIndex, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            Text("Koniec: ${endIndex.roundToInt()}")
-            Slider(value = endIndex, onValueChange = { endIndex = it.coerceAtLeast(startIndex + 1f) }, valueRange = 0f..maxIndex, modifier = Modifier.fillMaxWidth())
-        }
-
-        Spacer(Modifier.weight(1f))
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Button(onClick = { navController.popBackStack() }) { Text("Anuluj") }
-            Button(
-                onClick = {
-                    fullGesture?.let { gesture ->
-                        val start = startIndex.roundToInt()
-                        val end = endIndex.roundToInt()
-                        val trimmedAccel = if (accelData.isNotEmpty()) {
-                            val s = start.coerceIn(0, accelData.size)
-                            val e = end.coerceIn(s + 1, accelData.size)
-                            accelData.subList(s, e)
-                        } else emptyList()
-                        val trimmedGyro = if (gyroData.isNotEmpty() && trimmedAccel.isNotEmpty()) {
-                            val st = trimmedAccel.first().timestamp
-                            val et = trimmedAccel.last().timestamp
-                            gyroData.filter { it.timestamp in st..et }
-                        } else if (gyroData.isNotEmpty()) {
-                            val s = start.coerceIn(0, gyroData.size)
-                            val e = end.coerceIn(s + 1, gyroData.size)
-                            gyroData.subList(s, e)
-                        } else emptyList()
-                        GestureDataManager.updateGesture(context, gesture.copy(accelerometerData = trimmedAccel, gyroscopeData = trimmedGyro))
-                        navController.popBackStack()
-                    }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Edycja: $gestureName") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, "Wróć") }
                 },
-                enabled = fullGesture != null && (accelData.isNotEmpty() || gyroData.isNotEmpty())
-            ) { Text("Zapisz") }
+                actions = {
+                    IconButton(onClick = {
+                        GestureDataManager.updateGestureThreshold(context, gestureName, currentThreshold)
+                        hasChanges = false
+                        Toast.makeText(context, "Zapisano!", Toast.LENGTH_SHORT).show()
+                    }) {
+                        val tint = if(hasChanges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        Icon(Icons.Default.Check, "Zapisz Trudność", tint = tint)
+                    }
+                }
+            )
         }
-    }
-}
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (variants.isNotEmpty()) {
+                val currentVariant = variants.getOrNull(selectedVariantIndex)
 
-@Composable
-fun View2D(accelData: List<SensorSample>, gyroData: List<SensorSample>, startIdx: Int, endIdx: Int, modifier: Modifier = Modifier) {
-    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    Box(modifier.onSizeChanged { canvasSize = it }) {
-        Canvas(Modifier.fillMaxSize()) {
-            val w = canvasSize.width.toFloat()
-            val h = canvasSize.height.toFloat()
-            if (w == 0f || h == 0f) return@Canvas
-
-            val h1 = h * 0.5f
-            val h2 = h * 0.5f
-
-            // Akcelerometr
-            if (accelData.isNotEmpty()) {
-                val minV = accelData.minOfOrNull { min(it.x, min(it.y, it.z)) } ?: -10f
-                val maxV = accelData.maxOfOrNull { max(it.x, max(it.y, it.z)) } ?: 10f
-                val range = (maxV - minV).coerceAtLeast(0.1f)
-                fun scaleY1(v: Float) = h1 - ((v - minV) / range * h1)
-
-                val stepX = w / accelData.size.toFloat()
-                fun path(sel: (SensorSample) -> Float): Path {
-                    val p = Path()
-                    if (accelData.isEmpty()) return p
-                    p.moveTo(0f, scaleY1(sel(accelData[0])))
-                    for (i in 1 until accelData.size) p.lineTo(i * stepX, scaleY1(sel(accelData[i])))
-                    return p
-                }
-
-                clipRect(0f, 0f, w, h1) {
-                    drawPath(path { it.x }, Color.Gray.copy(0.3f), style = Stroke(2f))
-                    drawPath(path { it.y }, Color.Gray.copy(0.3f), style = Stroke(2f))
-                    drawPath(path { it.z }, Color.Gray.copy(0.3f), style = Stroke(2f))
-                    clipRect(startIdx * stepX, 0f, endIdx * stepX, h1) {
-                        drawPath(path { it.x }, Color.Red, style = Stroke(3f))
-                        drawPath(path { it.y }, Color.Green, style = Stroke(3f))
-                        drawPath(path { it.z }, Color.Blue, style = Stroke(3f))
+                // karuzela wzorców
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    // belka tytułowa
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { isChartExpanded = !isChartExpanded }
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Edytor Próbek", fontWeight = FontWeight.Bold)
+                            Text("${variants.size} warianty w pamięci", fontSize = 12.sp, color = Color.Gray)
+                        }
+                        Icon(if (isChartExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, "Zwiń")
                     }
-                }
 
-                drawIntoCanvas { canvas ->
-                    val paint = android.graphics.Paint().apply {
-                        textSize = 30f
-                        color = android.graphics.Color.WHITE
-                        isAntiAlias = true
-                    }
-                    canvas.nativeCanvas.drawText("Akcelerometr [m/s²]", 10f, 30f, paint)
-                    paint.textSize = 24f
-                    paint.color = android.graphics.Color.RED
-                    canvas.nativeCanvas.drawText("X", 10f, h1 - 10f, paint)
-                    paint.color = android.graphics.Color.GREEN
-                    canvas.nativeCanvas.drawText("Y", 40f, h1 - 10f, paint)
-                    paint.color = android.graphics.Color.BLUE
-                    canvas.nativeCanvas.drawText("Z", 70f, h1 - 10f, paint)
-                }
-            }
+                    if (isChartExpanded && currentVariant != null) {
+                        Column(Modifier.padding(16.dp)) {
 
-            // Żyroskop
-            if (gyroData.isNotEmpty()) {
-                val minV = gyroData.minOfOrNull { min(it.x, min(it.y, it.z)) } ?: -10f
-                val maxV = gyroData.maxOfOrNull { max(it.x, max(it.y, it.z)) } ?: 10f
-                val range = (maxV - minV).coerceAtLeast(0.1f)
-                fun scaleY2(v: Float) = h1 + h2 - ((v - minV) / range * h2)
+                            // NAWIGACJA PRÓBEK + USUWANIE
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(onClick = { if (selectedVariantIndex > 0) selectedVariantIndex-- }, enabled = selectedVariantIndex > 0) {
+                                    Icon(Icons.Default.KeyboardArrowLeft, "Poprzedni")
+                                }
 
-                val stepX = w / gyroData.size.toFloat()
-                fun path(sel: (SensorSample) -> Float): Path {
-                    val p = Path()
-                    if (gyroData.isEmpty()) return p
-                    p.moveTo(0f, scaleY2(sel(gyroData[0])))
-                    for (i in 1 until gyroData.size) p.lineTo(i * stepX, scaleY2(sel(gyroData[i])))
-                    return p
-                }
+                                Text("Wariant ${selectedVariantIndex + 1}", fontWeight = FontWeight.Bold)
 
-                clipRect(0f, h1, w, h) {
-                    drawPath(path { it.x }, Color.Gray.copy(0.3f), style = Stroke(2f))
-                    drawPath(path { it.y }, Color.Gray.copy(0.3f), style = Stroke(2f))
-                    drawPath(path { it.z }, Color.Gray.copy(0.3f), style = Stroke(2f))
+                                IconButton(onClick = { if (selectedVariantIndex < variants.size - 1) selectedVariantIndex++ }, enabled = selectedVariantIndex < variants.size - 1) {
+                                    Icon(Icons.Default.KeyboardArrowRight, "Następny")
+                                }
 
-                    if (accelData.isNotEmpty()) {
-                        val startTime = accelData.getOrNull(startIdx)?.timestamp ?: 0L
-                        val endTime = accelData.getOrNull(endIdx - 1)?.timestamp ?: Long.MAX_VALUE
-                        val gyroStartIdx = gyroData.indexOfFirst { it.timestamp >= startTime }
-                        val gyroEndIdx = gyroData.indexOfLast { it.timestamp <= endTime } + 1
+                                Spacer(Modifier.width(8.dp))
 
-                        if (gyroStartIdx != -1 && gyroEndIdx > gyroStartIdx) {
-                            clipRect(gyroStartIdx * stepX, h1, gyroEndIdx * stepX, h) {
-                                drawPath(path { it.x }, Color(0xFFFFA500), style = Stroke(3f))
-                                drawPath(path { it.y }, Color.Cyan, style = Stroke(3f))
-                                drawPath(path { it.z }, Color.Magenta, style = Stroke(3f))
+                                IconButton(
+                                    onClick = {
+                                        val allGestures = GestureDataManager.loadAllGestures(context)
+                                        val globalIndices = allGestures.mapIndexedNotNull { idx, g -> if (g.name == gestureName) idx else null }
+
+                                        if (globalIndices.size > selectedVariantIndex) {
+                                            val realIndex = globalIndices[selectedVariantIndex]
+                                            allGestures.removeAt(realIndex)
+                                            GestureDataManager.saveAllGestures(context, allGestures)
+
+                                            variants = allGestures.filter { it.name == gestureName }
+                                            if (selectedVariantIndex >= variants.size) {
+                                                selectedVariantIndex = (variants.size - 1).coerceAtLeast(0)
+                                            }
+                                            loadVariantData(variants, selectedVariantIndex)
+                                            Toast.makeText(context, "Usunięto wariant", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    enabled = variants.size > 1
+                                ) {
+                                    Icon(Icons.Default.Delete, "Usuń wariant", tint = if(variants.size > 1) MaterialTheme.colorScheme.error else Color.Gray)
+                                }
+                            }
+
+                            Divider(Modifier.padding(vertical = 8.dp))
+
+                            // WYKRES
+                            View2D(
+                                accelData = currentVariant.accelerometerData,
+                                gyroData = currentVariant.gyroscopeData,
+                                startIdx = trimStartIndex.roundToInt(),
+                                endIdx = trimEndIndex.roundToInt(),
+                                modifier = Modifier.height(220.dp).fillMaxWidth().background(Color.Black.copy(0.05f))
+                            )
+
+                            Spacer(Modifier.height(16.dp))
+
+                            Text("Początek przycięcia", fontSize = 12.sp, color = Color.Gray)
+                            Slider(
+                                value = trimStartIndex,
+                                onValueChange = { trimStartIndex = it.coerceAtMost(trimEndIndex - 5f) },
+                                valueRange = 0f..maxDataSize
+                            )
+
+                            Text("Koniec przycięcia", fontSize = 12.sp, color = Color.Gray)
+                            Slider(
+                                value = trimEndIndex,
+                                onValueChange = { trimEndIndex = it.coerceAtLeast(trimStartIndex + 5f) },
+                                valueRange = 0f..maxDataSize
+                            )
+
+                            Spacer(Modifier.height(8.dp))
+
+                            Button(
+                                onClick = {
+                                    val s = trimStartIndex.toInt()
+                                    val e = trimEndIndex.toInt()
+                                    if (s < e && currentVariant.accelerometerData.size > e) {
+                                        val newAccel = currentVariant.accelerometerData.subList(s, e)
+                                        if (newAccel.isNotEmpty()) {
+                                            val tStart = newAccel.first().timestamp
+                                            val tEnd = newAccel.last().timestamp
+                                            val newGyro = currentVariant.gyroscopeData.filter { it.timestamp in tStart..tEnd }
+
+                                            val updatedVariant = currentVariant.copy(accelerometerData = newAccel, gyroscopeData = newGyro)
+                                            val allGestures = GestureDataManager.loadAllGestures(context)
+                                            val globalIndices = allGestures.mapIndexedNotNull { idx, g -> if (g.name == gestureName) idx else null }
+
+                                            if (globalIndices.size > selectedVariantIndex) {
+                                                val realIndex = globalIndices[selectedVariantIndex]
+                                                allGestures[realIndex] = updatedVariant
+                                                GestureDataManager.saveAllGestures(context, allGestures)
+                                                variants = allGestures.filter { it.name == gestureName }
+                                                loadVariantData(variants, selectedVariantIndex)
+                                                Toast.makeText(context, "Przycięto i zapisano!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("ZAPISZ PRZYCIĘCIE TEGO WARIANTU")
                             }
                         }
                     }
                 }
 
-                drawIntoCanvas { canvas ->
-                    val paint = android.graphics.Paint().apply {
-                        textSize = 30f
-                        color = android.graphics.Color.WHITE
-                        isAntiAlias = true
-                    }
-                    canvas.nativeCanvas.drawText("Żyroskop [rad/s]", 10f, h1 + 30f, paint)
-                    paint.textSize = 24f
-                    paint.color = android.graphics.Color.rgb(255, 165, 0)
-                    canvas.nativeCanvas.drawText("X", 10f, h - 10f, paint)
-                    paint.color = android.graphics.Color.CYAN
-                    canvas.nativeCanvas.drawText("Y", 40f, h - 10f, paint)
-                    paint.color = android.graphics.Color.MAGENTA
-                    canvas.nativeCanvas.drawText("Z", 70f, h - 10f, paint)
+                Spacer(Modifier.height(24.dp))
+
+                // suwak trudności
+                Text("Trudność dla '$gestureName'", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+
+                Text("${currentThreshold.toInt()}", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Slider(
+                    value = currentThreshold,
+                    onValueChange = { currentThreshold = it; hasChanges = true },
+                    valueRange = 5f..100f,
+                    steps = 94
+                )
+                Text("5 = Bardzo Trudny | 100 = Bardzo Łatwy", fontSize = 12.sp, color = Color.Gray)
+                Text("(Ta wartość dotyczy tylko gestu '$gestureName')", fontSize = 10.sp, color = Color.Gray)
+
+                Spacer(Modifier.height(24.dp))
+
+                // tester
+                Text("Tester Gestu", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Button(
+                    onClick = {
+                        if (!isRecordingTest) {
+                            isRecordingTest = true
+                            testStatusText = "Nagrywanie."
+                            lastTestSuccess = null
+                        } else {
+                            isRecordingTest = false
+                            val score = GestureRecognizer.recognizeGesture(variants, liveAccel, liveGyro)
+                            lastTestScore = score
+                            lastTestSuccess = score < currentThreshold
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = if(isRecordingTest) Color.Red else MaterialTheme.colorScheme.secondary),
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                ) {
+                    Icon(if(isRecordingTest) Icons.Default.PlayArrow else Icons.Default.Refresh, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if(isRecordingTest) "STOP" else "SPRAWDŹ (TEST)")
+                }
+
+                if (lastTestSuccess != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(if(lastTestSuccess == true) "PASUJE (Błąd: ${lastTestScore.toInt()})" else "PUDŁO (Błąd: ${lastTestScore.toInt()})",
+                        color = if(lastTestSuccess == true) Color(0xFF2E7D32) else Color.Red, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Text("Brak danych gestu.")
+            }
+        }
+    }
+}
+
+// wykresiki
+@Composable
+fun View2D(accelData: List<SensorSample>, gyroData: List<SensorSample>, startIdx: Int, endIdx: Int, modifier: Modifier = Modifier) {
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    Box(modifier.onSizeChanged { canvasSize = it }) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = canvasSize.width.toFloat(); val h = canvasSize.height.toFloat()
+            if (w == 0f || h == 0f) return@Canvas
+            val h1 = h * 0.5f; val h2 = h * 0.5f
+
+            fun drawSensor(data: List<SensorSample>, top: Float, height: Float) {
+                if (data.isEmpty()) return
+                val minV = data.minOfOrNull { min(it.x, min(it.y, it.z)) } ?: -10f
+                val maxV = data.maxOfOrNull { max(it.x, max(it.y, it.z)) } ?: 10f
+                val range = (maxV - minV).coerceAtLeast(0.1f)
+                val stepX = w / data.size.toFloat()
+
+                fun scale(v: Float) = top + height - ((v - minV) / range * height)
+                fun path(sel: (SensorSample) -> Float): Path {
+                    val p = Path().apply { moveTo(0f, scale(sel(data[0]))) }
+                    for (i in 1 until data.size) p.lineTo(i * stepX, scale(sel(data[i])))
+                    return p
+                }
+
+                clipRect(0f, top, w, top + height) {
+                    drawPath(path { it.x }, Color.LightGray.copy(0.3f), style = Stroke(2f))
+                    drawPath(path { it.y }, Color.LightGray.copy(0.3f), style = Stroke(2f))
+                    drawPath(path { it.z }, Color.LightGray.copy(0.3f), style = Stroke(2f))
+                }
+
+                val clipStart = startIdx * stepX
+                val clipEnd = endIdx * stepX
+                clipRect(clipStart, top, clipEnd, top + height) {
+                    drawPath(path { it.x }, if(top==0f) Color.Red else Color(0xFFFFA500), style = Stroke(3f))
+                    drawPath(path { it.y }, if(top==0f) Color.Green else Color.Cyan, style = Stroke(3f))
+                    drawPath(path { it.z }, if(top==0f) Color.Blue else Color.Magenta, style = Stroke(3f))
                 }
             }
+
+            drawSensor(accelData, 0f, h1)
+            drawSensor(gyroData, h1, h2)
+
+            val stepX = w / accelData.size.toFloat()
+            drawLine(Color.Black, Offset(startIdx * stepX, 0f), Offset(startIdx * stepX, h), strokeWidth = 2f)
+            drawLine(Color.Black, Offset(endIdx * stepX, 0f), Offset(endIdx * stepX, h), strokeWidth = 2f)
+
+            drawIntoCanvas {
+                val paint = android.graphics.Paint().apply {
+                    textSize = 32f
+                    color = android.graphics.Color.DKGRAY
+                    isFakeBoldText = true
+                }
+                it.nativeCanvas.drawText("AKCELEROMETR (Siła/Ruch)", 20f, 40f, paint)
+                it.nativeCanvas.drawText("ŻYROSKOP (Obrót)", 20f, h1 + 40f, paint)
+            }
+
+            drawLine(Color.Gray, Offset(0f, h1), Offset(w, h1), strokeWidth = 1f)
         }
     }
 }

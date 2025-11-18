@@ -3,12 +3,14 @@ package com.example.gesturepulse
 import android.content.Context
 import android.util.Log
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 
 const val GESTURE_FILE_NAME = "my_gestures.json"
 
+/**
+ * Definicja pojedynczej próbki danych z sensora.
+ */
 @Serializable
 data class SensorSample(
     val timestamp: Long,
@@ -17,17 +19,31 @@ data class SensorSample(
     val z: Float
 )
 
+/**
+ * Struktura danych dla gestu.
+ * Dodano pole 'threshold' z wartością domyślną 20.0f.
+ */
+
+/**
+ * TODO: te warianty mają być częscią gesty a nie standalone, (ale narazie tak jest i działa)
+ */
 @Serializable
 data class Gesture(
     val name: String,
     val accelerometerData: List<SensorSample>,
-    val gyroscopeData: List<SensorSample>
+    val gyroscopeData: List<SensorSample>,
+    val threshold: Float = 20.0f // margines błędu
 )
 
 object GestureDataManager {
 
-    private val json = Json { prettyPrint = true }
+    private val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
 
+    //READ
     fun loadAllGestures(context: Context): MutableList<Gesture> {
         return try {
             val file = File(context.filesDir, GESTURE_FILE_NAME)
@@ -42,6 +58,7 @@ object GestureDataManager {
         }
     }
 
+    //CREATE
     fun saveAllGestures(context: Context, gestures: List<Gesture>) {
         try {
             val file = File(context.filesDir, GESTURE_FILE_NAME)
@@ -51,32 +68,35 @@ object GestureDataManager {
             Log.e("GestureDataManager", "Błąd zapisu gestów", e)
         }
     }
-
-    /**
-     * Dodaje nowy gest do listy (pozwala na duplikaty nazw - warianty).
-     */
     fun addGesture(context: Context, gesture: Gesture) {
         val allGestures = loadAllGestures(context)
         allGestures.add(gesture)
         saveAllGestures(context, allGestures)
     }
 
-    fun updateGesture(context: Context, updatedGesture: Gesture) {
-        // Ta funkcja aktualizuje PIERWSZE wystąpienie o danej nazwie
-        // W modelu multi-sample rzadziej używana, ale zostawiamy dla edytora
-        val allGestures = loadAllGestures(context)
-        val index = allGestures.indexOfFirst { it.name == updatedGesture.name }
 
-        if (index != -1) {
-            allGestures[index] = updatedGesture
-            saveAllGestures(context, allGestures)
-        } else {
-            Log.w("GestureDataManager", "Nie znaleziono gestu '${updatedGesture.name}' do aktualizacji.")
+    // margines błedu dla takich samych wariantów (UPDATE)
+    fun updateGestureThreshold(context: Context, gestureName: String, newThreshold: Float) {
+        val allGestures = loadAllGestures(context)
+        var updated = false
+
+        val newGestures = allGestures.map {
+            if (it.name == gestureName) {
+                updated = true
+                it.copy(threshold = newThreshold)
+            } else {
+                it
+            }
+        }
+
+        if (updated) {
+            saveAllGestures(context, newGestures)
+            Log.d("GestureDataManager", "Zaktualizowano threshold dla '$gestureName' na $newThreshold")
         }
     }
 
+    //DELETE
     fun deleteGesture(context: Context, gestureName: String) {
-        // Usuwa WSZYSTKIE warianty o tej nazwie
         val allGestures = loadAllGestures(context)
         val filtered = allGestures.filter { it.name != gestureName }
 
