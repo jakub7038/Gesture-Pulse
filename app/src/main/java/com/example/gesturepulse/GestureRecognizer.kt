@@ -12,9 +12,8 @@ import kotlin.math.sqrt
 object GestureRecognizer {
     /**
      * Analizuje gest wejściowy porównując go z całą LISTĄ próbek treningowych.
-     * Zwraca wynik najlepszego dopasowania (najmniejszy dystans).
      */
-    fun recognize( // Zmieniona nazwa
+    fun recognize(
         trainingVariants: List<Gesture>,
         liveAccel: List<SensorSample>,
         liveGyro: List<SensorSample>

@@ -21,7 +21,7 @@ import kotlinx.coroutines.delay
 
 sealed class GameState {
     object Idle : GameState()
-    // ZMIENIONO: Przechowuje obiekt Command, a nie jego części
+    // Przechowuje obiekt Command, a nie jego części
     data class Countdown(val command: Command, val timeLeft: Int) : GameState()
     data class Recording(val command: Command) : GameState()
     data class Analyzing(val command: Command) : GameState()
@@ -38,7 +38,7 @@ fun rememberGameController(
     val score = remember { mutableIntStateOf(0) }
     val gameState = remember { mutableStateOf<GameState>(GameState.Idle) }
 
-    // ZMIENIONO: Wczytujemy listę Komend (Command), a nie Mapę Gestów (Map<String, List<Gesture>>)
+    // Wczytujemy listę Komend
     val allCommands = remember { mutableStateOf<List<Command>>(emptyList()) }
 
     val liveAccelData = remember { mutableStateListOf<SensorSample>() }
@@ -46,11 +46,10 @@ fun rememberGameController(
 
     // Wczytanie gestów przy starcie
     LaunchedEffect(Unit) {
-        // ZMIENIONO: Używamy nowej funkcji loadAllGestures, która zwraca List<Command>
         allCommands.value = GestureDataManager.loadAllGestures(context)
     }
 
-    // GŁÓWNA PĘTLA LOGIKI GRY
+    // pętla gry
     LaunchedEffect(gameState.value) {
         when (val state = gameState.value) {
             is GameState.Idle -> {}
@@ -60,7 +59,6 @@ fun rememberGameController(
                     delay(1000)
                     gameState.value = state.copy(timeLeft = state.timeLeft - 1)
                 } else {
-                    // ZMIENIONO: Przechodzimy do Recording, przekazując obiekt Command
                     gameState.value = GameState.Recording(state.command)
                 }
             }
@@ -77,11 +75,11 @@ fun rememberGameController(
             is GameState.Analyzing -> {
                 sensorHandler.stopListening()
 
-                // ZMIENIONO: Pobieramy próg i warianty bezpośrednio z obiektu Command
+                // Pobieramy próg i warianty bezpośrednio z obiektu Command
                 val command = state.command
                 val difficultyThreshold = command.threshold.toDouble()
 
-                // ZMIENIONO: Używamy nowej nazwy funkcji GestureRecognizer.recognize
+                // Używamy nowej nazwy funkcji GestureRecognizer.recognize
                 val totalDistance = GestureRecognizer.recognize(
                     trainingVariants = command.variants,
                     liveAccel = liveAccelData.toList(),
@@ -96,7 +94,7 @@ fun rememberGameController(
                 if (state.success) {
                     score.intValue++
                     if (allCommands.value.isNotEmpty()) {
-                        // ZMIENIONO: Losowanie nowej Komendy (Command)
+                        // Losowanie nowej Komendy (Command)
                         val nextCommand = allCommands.value.random()
                         gameState.value = GameState.Countdown(nextCommand, 2)
                     } else {
@@ -114,12 +112,12 @@ fun rememberGameController(
         }
     }
 
-    // ZMIENIONO: Przekazujemy listę Komend (allCommands) zamiast Mapy
+    // ZPrzekazujemy listę Komend
     return remember(score, gameState, allCommands) {
         GameController(
             score = score,
             gameState = gameState,
-            allCommands = allCommands, // Zmieniono nazwę parametru
+            allCommands = allCommands,
             context = context,
             navController = navController
         )
@@ -130,7 +128,7 @@ fun rememberGameController(
 class GameController(
     private val score: MutableIntState,
     private val gameState: MutableState<GameState>,
-    private val allCommands: State<List<Command>>, // ZMIENIONO: Typ na List<Command>
+    private val allCommands: State<List<Command>>,
     private val context: Context,
     private val navController: NavController
 ) {
@@ -142,7 +140,7 @@ class GameController(
     fun startGame() {
         if (allCommands.value.isNotEmpty()) {
             score.intValue = 0
-            // ZMIENIONO: Losowanie całego obiektu Command
+            // Losowanie całego obiektu Command
             val k = allCommands.value.random()
             gameState.value = GameState.Countdown(k, 2)
         }
@@ -151,7 +149,7 @@ class GameController(
     fun stopRecording() {
         if (gameState.value is GameState.Recording) {
             val state = gameState.value as GameState.Recording
-            // ZMIENIONO: Przechodzimy do Analyzing, przekazując obiekt Command
+            // Przechodzimy do Analyzing, przekazując obiekt Command
             gameState.value = GameState.Analyzing(state.command)
         }
     }
@@ -237,7 +235,7 @@ private fun GameScreenContent(controller: GameController) {
                     Spacer(Modifier.height(16.dp))
 
                     Text(
-                        // ZMIENIONO: Pobieramy nazwę z obiektu Command
+                        //  Pobieramy nazwę z obiektu Command
                         state.command.name,
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Bold,
@@ -297,7 +295,6 @@ private fun GameScreenContent(controller: GameController) {
 
                     Spacer(Modifier.height(24.dp))
                     Text("Wynik: ${"%.1f".format(state.score)}", fontSize = 24.sp)
-                    // ZMIENIONO: Bierzemy próg błędu bezpośrednio ze stanu ShowResult
                     Text("Limit błędu: ${state.threshold.toInt()}", fontSize = 16.sp, color = Color.Gray)
                 }
 

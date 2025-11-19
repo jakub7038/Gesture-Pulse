@@ -181,8 +181,8 @@ fun MenuButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier)
     val buttonShape = RoundedCornerShape(16.dp)
 
     val colors = ButtonDefaults.buttonColors(
-        containerColor = Color(0xFFFF5A22),
-        contentColor = Color(0xFFFFFFFF)
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary
     )
 
     val fontWeight = FontWeight.Bold
