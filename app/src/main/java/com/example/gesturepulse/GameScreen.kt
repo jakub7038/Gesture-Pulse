@@ -1,6 +1,7 @@
 package com.example.gesturepulse
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import androidx.compose.foundation.layout.*
@@ -90,7 +91,12 @@ fun rememberGameController(
             }
 
             is GameState.ShowResult -> {
+                if (!state.success) {
+                    vibrate(context)
+                }
+
                 delay(2000)
+
                 if (state.success) {
                     score.intValue++
                     if (allCommands.value.isNotEmpty()) {
@@ -102,7 +108,6 @@ fun rememberGameController(
                         gameState.value = GameState.GameOver
                     }
                 } else {
-                    vibrate(context)
                     gameState.value = GameState.GameOver
                 }
             }
@@ -218,7 +223,7 @@ private fun GameScreenContent(controller: GameController) {
                     Spacer(Modifier.height(32.dp))
 
                     if (!controller.hasGestures) {
-                        Text("Brak nagranych gestów!.", textAlign = TextAlign.Center)
+                        Text("Brak nagranych gestów!", textAlign = TextAlign.Center)
                     } else {
                         Button(
                             onClick = { controller.startGame() },
@@ -357,8 +362,34 @@ private fun GameScreenContent(controller: GameController) {
 }
 
 private fun vibrate(context: Context) {
+    val strength = SettingsManager.getVibrationStrength(context)
+    if (strength == SettingsManager.VIBRATION_OFF) return
+
     try {
-        val v = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-        v.defaultVibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
-    } catch (_: Exception) {}
+        // Ponieważ minSdk = 31, VibratorManager jest zawsze dostępny
+        val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        val vibrator = vibratorManager.defaultVibrator
+
+        if (vibrator.hasVibrator()) {
+            // Trik na Motorolę: AudioAttributes jako ALARM
+            val attributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
+            val isStrong = (strength == SettingsManager.VIBRATION_STRONG)
+
+            // Krótsze czasy, bo tryb ALARM bije mocno
+            val duration = if (isStrong) 500L else 100L
+            val amplitude = if (isStrong) 255 else 80
+
+            val effect = VibrationEffect.createOneShot(duration, amplitude)
+
+            // Tłumimy ostrzeżenie, bo musimy użyć tej metody dla triku z AudioAttributes
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(effect, attributes)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }

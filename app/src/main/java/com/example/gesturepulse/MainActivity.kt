@@ -93,6 +93,11 @@ class MainActivity : ComponentActivity() {
                         composable("rankings") {
                             RankingScreen(navController = navController)
                         }
+
+                        // --- Ustawienia ---
+                        composable("settings") {
+                            SettingsScreen(navController = navController)
+                        }
                     }
                 }
             }
@@ -169,7 +174,7 @@ fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) 
 
         MenuButton(
             text = "Ustawienia",
-            onClick = { /*TODO: navController.navigate("settings")*/ },
+            onClick = { navController.navigate("settings") },
             color = MaterialTheme.colorScheme.surfaceVariant,
             textColor = MaterialTheme.colorScheme.onSurface
         )
