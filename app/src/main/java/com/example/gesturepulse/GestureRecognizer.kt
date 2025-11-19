@@ -14,12 +14,12 @@ object GestureRecognizer {
      * Analizuje gest wejściowy porównując go z całą LISTĄ próbek treningowych.
      * Zwraca wynik najlepszego dopasowania (najmniejszy dystans).
      */
-    fun recognizeGesture(
-        trainingSet: List<Gesture>, // Lista wszystkich nagranych wariantów
+    fun recognize( // Zmieniona nazwa
+        trainingVariants: List<Gesture>,
         liveAccel: List<SensorSample>,
         liveGyro: List<SensorSample>
     ): Double {
-        if (trainingSet.isEmpty()) return Double.POSITIVE_INFINITY
+        if (trainingVariants.isEmpty()) return Double.POSITIVE_INFINITY
 
         // Przygotuj dane wejściowe (live) raz, aby nie liczyć tego w pętli
         val liveAccelMag = extractMagnitude(liveAccel)
@@ -28,7 +28,7 @@ object GestureRecognizer {
         var bestTotalDistance = Double.POSITIVE_INFINITY
 
         // Sprawdź każdy wariant z zestawu treningowego
-        for (sample in trainingSet) {
+        for (sample in trainingVariants) {
             // Dane wzorca
             val savedAccelMag = extractMagnitude(sample.accelerometerData)
             val savedGyroMag = extractMagnitude(sample.gyroscopeData)
@@ -45,7 +45,7 @@ object GestureRecognizer {
             }
         }
 
-        Log.d("GestureRecognizer", "Najlepszy wynik (spośród ${trainingSet.size} próbek): $bestTotalDistance")
+        Log.d("GestureRecognizer", "Najlepszy wynik (spośród ${trainingVariants.size} próbek): $bestTotalDistance")
         return bestTotalDistance
     }
 

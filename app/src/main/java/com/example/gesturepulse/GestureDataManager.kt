@@ -21,18 +21,24 @@ data class SensorSample(
 
 /**
  * Struktura danych dla gestu.
- * Dodano pole 'threshold' z wartością domyślną 20.0f.
  */
 
-/**
- * TODO: te warianty mają być częscią gesty a nie standalone, (ale narazie tak jest i działa)
- */
 @Serializable
 data class Gesture(
     val name: String,
     val accelerometerData: List<SensorSample>,
-    val gyroscopeData: List<SensorSample>,
-    val threshold: Float = 20.0f // margines błędu
+    val gyroscopeData: List<SensorSample>
+)
+
+/**
+ *  grupowane warianty i wspólny próg błędu
+ * jest to teraz główna struktura gestów
+ */
+@Serializable
+data class Command(
+    val name: String,
+    val variants: MutableList<Gesture>,
+    val threshold: Float = 20.0f //margines błędu
 )
 
 object GestureDataManager {
@@ -44,7 +50,7 @@ object GestureDataManager {
     }
 
     //READ
-    fun loadAllGestures(context: Context): MutableList<Gesture> {
+    fun loadAllGestures(context: Context): MutableList<Command> {
         return try {
             val file = File(context.filesDir, GESTURE_FILE_NAME)
             if (!file.exists()) {
@@ -59,29 +65,38 @@ object GestureDataManager {
     }
 
     //CREATE
-    fun saveAllGestures(context: Context, gestures: List<Gesture>) {
+    fun saveAllGestures(context: Context, commands: List<Command>) {
         try {
             val file = File(context.filesDir, GESTURE_FILE_NAME)
-            val jsonString = json.encodeToString(gestures)
+            val jsonString = json.encodeToString(commands)
             file.writeText(jsonString)
         } catch (e: Exception) {
             Log.e("GestureDataManager", "Błąd zapisu gestów", e)
         }
     }
-    fun addGesture(context: Context, gesture: Gesture) {
-        val allGestures = loadAllGestures(context)
-        allGestures.add(gesture)
-        saveAllGestures(context, allGestures)
+
+    fun addCommand(context: Context, command: Command) {
+        val allCommands = loadAllGestures(context)
+        allCommands.add(command)
+        saveAllGestures(context, allCommands)
     }
 
+    // miałobyc dodawania wariatn uw edytorze ale po co to komu
+    fun addVariant(context: Context, gestureName: String, variant: Gesture) {
+        val allCommands = loadAllGestures(context)
+        val command = allCommands.find { it.name == gestureName }
+        command?.variants?.add(variant)
+        saveAllGestures(context, allCommands)
+    }
 
-    // margines błedu dla takich samych wariantów (UPDATE)
-    fun updateGestureThreshold(context: Context, gestureName: String, newThreshold: Float) {
-        val allGestures = loadAllGestures(context)
+    // UPDATE
+    // margines błedu dla takich samych wariantów
+    fun updateCommandThreshold(context: Context, commandName: String, newThreshold: Float) {
+        val allCommands = loadAllGestures(context)
         var updated = false
 
-        val newGestures = allGestures.map {
-            if (it.name == gestureName) {
+        val newCommands = allCommands.map {
+            if (it.name == commandName) {
                 updated = true
                 it.copy(threshold = newThreshold)
             } else {
@@ -90,18 +105,44 @@ object GestureDataManager {
         }
 
         if (updated) {
-            saveAllGestures(context, newGestures)
-            Log.d("GestureDataManager", "Zaktualizowano threshold dla '$gestureName' na $newThreshold")
+            saveAllGestures(context, newCommands)
+            Log.d("GestureDataManager", "Zaktualizowano threshold dla '$commandName' na $newThreshold")
+        }
+    }
+
+    // Aktualizacja wariantu wewnątrz komendy
+    fun updateVariant(context: Context, commandName: String, variantIndex: Int, newVariant: Gesture) {
+        val allCommands = loadAllGestures(context)
+        val command = allCommands.find { it.name == commandName }
+
+        command?.let {
+            if (variantIndex >= 0 && variantIndex < it.variants.size) {
+                it.variants[variantIndex] = newVariant
+                saveAllGestures(context, allCommands)
+            }
         }
     }
 
     //DELETE
-    fun deleteGesture(context: Context, gestureName: String) {
-        val allGestures = loadAllGestures(context)
-        val filtered = allGestures.filter { it.name != gestureName }
+    fun deleteCommand(context: Context, commandName: String) {
+        val allCommands = loadAllGestures(context)
+        val filtered = allCommands.filter { it.name != commandName }
 
-        if (filtered.size != allGestures.size) {
+        if (filtered.size != allCommands.size) {
             saveAllGestures(context, filtered)
+            Log.d("GestureDataManager", "Usunięto komendę '$commandName'")
+        }
+    }
+
+    fun deleteVariant(context: Context, commandName: String, variantIndex: Int) {
+        val allCommands = loadAllGestures(context)
+        val command = allCommands.find { it.name == commandName }
+
+        command?.let {
+            if (variantIndex >= 0 && variantIndex < it.variants.size) {
+                it.variants.removeAt(variantIndex)
+                saveAllGestures(context, allCommands)
+            }
         }
     }
 }

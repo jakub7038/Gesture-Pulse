@@ -43,8 +43,8 @@ import kotlin.math.roundToInt
 @Composable
 fun GestureEditorScreen(navController: NavController, gestureName: String, sensorHandler: SensorHandler) {
     val context = LocalContext.current
-
-    // dane
+    
+    var command by remember { mutableStateOf<Command?>(null) }
     var variants by remember { mutableStateOf(listOf<Gesture>()) }
     var currentThreshold by remember { mutableFloatStateOf(20.0f) }
     var hasChanges by remember { mutableStateOf(false) }
@@ -78,17 +78,22 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
         }
     }
 
-    LaunchedEffect(gestureName) {
+    // ładowanie komend
+    fun refreshCommand() {
         val all = GestureDataManager.loadAllGestures(context)
-        variants = all.filter { it.name == gestureName }
-        if (variants.isNotEmpty()) {
-            currentThreshold = variants.first().threshold
-            loadVariantData(variants, 0)
+        command = all.find { it.name == gestureName }
+
+        command?.let {
+            variants = it.variants
+            currentThreshold = it.threshold
+            loadVariantData(variants, selectedVariantIndex)
         }
     }
 
+    LaunchedEffect(gestureName) { refreshCommand() }
+
     LaunchedEffect(selectedVariantIndex) {
-        loadVariantData(variants, selectedVariantIndex)
+        if(variants.isNotEmpty()) loadVariantData(variants, selectedVariantIndex)
     }
 
     DisposableEffect(isRecordingTest) {
@@ -111,7 +116,7 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                 },
                 actions = {
                     IconButton(onClick = {
-                        GestureDataManager.updateGestureThreshold(context, gestureName, currentThreshold)
+                        GestureDataManager.updateCommandThreshold(context, gestureName, currentThreshold)
                         hasChanges = false
                         Toast.makeText(context, "Zapisano!", Toast.LENGTH_SHORT).show()
                     }) {
@@ -131,7 +136,7 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (variants.isNotEmpty()) {
+            if (variants.isNotEmpty() && command != null) {
                 val currentVariant = variants.getOrNull(selectedVariantIndex)
 
                 // karuzela wzorców
@@ -179,21 +184,16 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
 
                                 IconButton(
                                     onClick = {
-                                        val allGestures = GestureDataManager.loadAllGestures(context)
-                                        val globalIndices = allGestures.mapIndexedNotNull { idx, g -> if (g.name == gestureName) idx else null }
+                                        GestureDataManager.deleteVariant(context, gestureName, selectedVariantIndex)
 
-                                        if (globalIndices.size > selectedVariantIndex) {
-                                            val realIndex = globalIndices[selectedVariantIndex]
-                                            allGestures.removeAt(realIndex)
-                                            GestureDataManager.saveAllGestures(context, allGestures)
-
-                                            variants = allGestures.filter { it.name == gestureName }
-                                            if (selectedVariantIndex >= variants.size) {
-                                                selectedVariantIndex = (variants.size - 1).coerceAtLeast(0)
-                                            }
-                                            loadVariantData(variants, selectedVariantIndex)
-                                            Toast.makeText(context, "Usunięto wariant", Toast.LENGTH_SHORT).show()
+                                        // Odświeżenie stanu
+                                        refreshCommand()
+                                        if (variants.isEmpty()) {
+                                            navController.popBackStack()
+                                        } else {
+                                            selectedVariantIndex = (variants.size - 1).coerceAtLeast(0)
                                         }
+                                        Toast.makeText(context, "Usunięto wariant", Toast.LENGTH_SHORT).show()
                                     },
                                     enabled = variants.size > 1
                                 ) {
@@ -203,7 +203,6 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
 
                             HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
-                            // WYKRES
                             View2D(
                                 accelData = currentVariant.accelerometerData,
                                 gyroData = currentVariant.gyroscopeData,
@@ -242,17 +241,11 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                                             val newGyro = currentVariant.gyroscopeData.filter { it.timestamp in tStart..tEnd }
 
                                             val updatedVariant = currentVariant.copy(accelerometerData = newAccel, gyroscopeData = newGyro)
-                                            val allGestures = GestureDataManager.loadAllGestures(context)
-                                            val globalIndices = allGestures.mapIndexedNotNull { idx, g -> if (g.name == gestureName) idx else null }
 
-                                            if (globalIndices.size > selectedVariantIndex) {
-                                                val realIndex = globalIndices[selectedVariantIndex]
-                                                allGestures[realIndex] = updatedVariant
-                                                GestureDataManager.saveAllGestures(context, allGestures)
-                                                variants = allGestures.filter { it.name == gestureName }
-                                                loadVariantData(variants, selectedVariantIndex)
-                                                Toast.makeText(context, "Przycięto i zapisano!", Toast.LENGTH_SHORT).show()
-                                            }
+                                            GestureDataManager.updateVariant(context, gestureName, selectedVariantIndex, updatedVariant)
+
+                                            refreshCommand()
+                                            Toast.makeText(context, "Przycięto i zapisano!", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 },
@@ -291,7 +284,7 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                             lastTestSuccess = null
                         } else {
                             isRecordingTest = false
-                            val score = GestureRecognizer.recognizeGesture(variants, liveAccel, liveGyro)
+                            val score = GestureRecognizer.recognize(variants, liveAccel, liveGyro)
                             lastTestScore = score
                             lastTestSuccess = score < currentThreshold
                         }

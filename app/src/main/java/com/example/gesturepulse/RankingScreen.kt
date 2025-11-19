@@ -13,11 +13,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,13 +44,8 @@ fun RankingScreen(navController: NavController) {
             .fillMaxSize()
             .statusBarsPadding()
             .padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Wróć")
-            }
-            Spacer(Modifier.width(8.dp))
-            Text("Rankingi", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        }
+        Text("Rankingi", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+
         Spacer(Modifier.height(16.dp))
 
         if (scores.isEmpty()) {

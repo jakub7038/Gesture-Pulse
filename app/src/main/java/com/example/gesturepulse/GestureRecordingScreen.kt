@@ -1,6 +1,5 @@
 package com.example.gesturepulse
 
-import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,12 +46,13 @@ fun GestureRecordingScreen(
     var gestureName by remember { mutableStateOf("") }
     var isRecording by remember { mutableStateOf(false) }
 
-    // licznik próbek min 3
-    var currentStep by remember { mutableIntStateOf(1) }
-    val totalSteps = 3
+    val minimumSteps = 3
 
-    // tymczasowa lista do przechowywania nagranych wariantów przed ostatecznym zapisem
-    val tempRecordedGestures = remember { mutableListOf<Gesture>() }
+    // Komenda budowana
+    val recordedCommand = remember { mutableStateOf<Command?>(null) }
+
+    // aktualizacja licznika przy każdej zmiane wartości
+    val currentVariantCount = recordedCommand.value?.variants?.size ?: 0
 
     // bufory na dane sensora
     val accelData = remember { mutableStateListOf<SensorSample>() }
@@ -98,10 +97,14 @@ fun GestureRecordingScreen(
 
         // pasek postępu
         LinearProgressIndicator(
-            progress = { (currentStep - 1) / totalSteps.toFloat() },
+            progress = { currentVariantCount.toFloat().coerceAtMost(minimumSteps.toFloat()) / minimumSteps.toFloat() },
             modifier = Modifier.fillMaxWidth().height(8.dp),
         )
-        Text("Postęp: Próbka $currentStep z $totalSteps", fontSize = 12.sp, color = Color.Gray)
+        Text(
+            "Postęp: Wariant ${currentVariantCount + 1} z minimum $minimumSteps",
+            fontSize = 12.sp,
+            color = Color.Gray
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -111,7 +114,7 @@ fun GestureRecordingScreen(
             onValueChange = { gestureName = it },
             label = { Text("Nazwa gestu (np. Wymach)") },
             modifier = Modifier.fillMaxWidth(),
-            enabled = currentStep == 1 && !isRecording,
+            enabled = currentVariantCount == 0 && !isRecording,
             singleLine = true
         )
 
@@ -125,9 +128,9 @@ fun GestureRecordingScreen(
             Text(
                 text = when {
                     isRecording -> "Ruch trwa... Wykonaj gest!"
-                    currentStep == 1 -> "Aby algorytm działał precyzyjnie, musisz nagrać ten sam ruch 3 razy."
-                    currentStep <= totalSteps -> "Świetnie! Teraz powtórz ten sam ruch (Próba $currentStep)."
-                    else -> "Gotowe!"
+                    currentVariantCount < minimumSteps -> "Aby algorytm działał precyzyjnie, musisz nagrać ten sam ruch minimum $minimumSteps razy. Pozostało: ${minimumSteps - currentVariantCount}."
+                    currentVariantCount == minimumSteps -> "Wymagane próbki nagrane. Możesz teraz ZAPISAĆ lub dodać więcej."
+                    else -> "Dodano ${currentVariantCount - minimumSteps} dodatkowych próbek. Warto dodać więcej!"
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -138,8 +141,9 @@ fun GestureRecordingScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // przycisk nagrywania
         val buttonColor = if (isRecording) Color.Red else MaterialTheme.colorScheme.primary
+
+        val canSave = currentVariantCount >= minimumSteps && !isRecording
 
         //zapisywanie gestu
         Button(
@@ -161,24 +165,24 @@ fun GestureRecordingScreen(
                         return@Button
                     }
 
-                    val sample = Gesture(
+                    val newVariant = Gesture(
                         name = gestureName.trim(),
                         accelerometerData = accelData.toList(),
                         gyroscopeData = gyroData.toList()
                     )
-                    tempRecordedGestures.add(sample)
 
-                    if (currentStep < totalSteps) {
-                        currentStep++
-                        Toast.makeText(context, "Próbka zapisana. Kolejna...", Toast.LENGTH_SHORT).show()
+                    if (currentVariantCount == 0) {
+                        // inicjalizacja komendy
+                        recordedCommand.value = Command(
+                            name = gestureName.trim(),
+                            variants = mutableListOf(newVariant)
+                        )
                     } else {
-                        saveAllSamples(context, tempRecordedGestures)
-                        Toast.makeText(context, "Gest '$gestureName' utworzony pomyślnie!", Toast.LENGTH_LONG).show()
-
-                        navController.navigate("menu") {
-                            popUpTo("menu") { inclusive = true }
-                        }
+                        // dodanie kolejnego wariantu
+                        recordedCommand.value?.variants?.add(newVariant)
                     }
+
+                    Toast.makeText(context, "Próbka zapisana. Dodano wariant ${currentVariantCount + 1}.", Toast.LENGTH_SHORT).show()
                 }
             },
             modifier = Modifier
@@ -188,33 +192,42 @@ fun GestureRecordingScreen(
         ) {
             Text(
                 if (isRecording) "STOP"
-                else if (currentStep == 1) "START (Próba 1)"
-                else "START (Próba $currentStep)",
+                else "NAGRAJ WARIANT",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
         }
 
+        // przycisk zapisania komendy
+        if (canSave) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    recordedCommand.value?.let { command ->
+                        GestureDataManager.addCommand(context, command)
+                    }
+
+                    Toast.makeText(context, "Gest '$gestureName' utworzony pomyślnie!", Toast.LENGTH_LONG).show()
+
+                    navController.navigate("menu") {
+                        popUpTo("menu") { inclusive = true }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(60.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+            ) {
+                Text(
+                    "ZAPISZ GEST ($currentVariantCount warianty)",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (currentStep > 1) {
+        if (currentVariantCount > 0) {
             Text("Nie martw się o drobne różnice – to pomaga algorytmowi!", fontSize = 12.sp, color = Color.Gray)
         }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Button(
-            onClick = { navController.popBackStack() },
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
-        ) {
-            Text("Anuluj")
-        }
-    }
-}
-
-
-private fun saveAllSamples(context: Context, samples: List<Gesture>) {
-    samples.forEach { gesture ->
-        GestureDataManager.addGesture(context, gesture)
     }
 }
