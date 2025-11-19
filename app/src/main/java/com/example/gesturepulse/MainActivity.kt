@@ -1,8 +1,9 @@
 package com.example.gesturepulse
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -101,9 +102,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) {
-    // exit to chce po coś
     val context = LocalContext.current
-    val activity = (LocalContext.current as? Activity)
+    val activity = context.findActivity()
 
     Column(
         modifier = modifier
@@ -195,4 +195,11 @@ fun MenuButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier)
     ) {
         Text(text, fontSize = 20.sp, fontWeight = fontWeight)
     }
+}
+
+// Funkcja rozszerzająca do bezpiecznego pobierania Activity z Context
+private fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

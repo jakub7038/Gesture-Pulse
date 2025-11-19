@@ -55,8 +55,6 @@ fun GestureRecordingScreen(
     // tymczasowa lista do przechowywania nagranych wariantów przed ostatecznym zapisem
     val tempRecordedGestures = remember { mutableListOf<Gesture>() }
 
-    var statusText by remember { mutableStateOf("Podaj nazwę i naciśnij Start") }
-
     // bufory na dane sensora
     val accelData = remember { mutableStateListOf<SensorSample>() }
     val gyroData = remember { mutableStateListOf<SensorSample>() }
@@ -155,7 +153,6 @@ fun GestureRecordingScreen(
                     accelData.clear()
                     gyroData.clear()
                     isRecording = true
-                    statusText = "Nagrywanie próbki $currentStep..."
                 } else {
                     isRecording = false
 
@@ -173,7 +170,6 @@ fun GestureRecordingScreen(
 
                     if (currentStep < totalSteps) {
                         currentStep++
-                        statusText = "Przygotuj się do próbki $currentStep..."
                         Toast.makeText(context, "Próbka zapisana. Kolejna...", Toast.LENGTH_SHORT).show()
                     } else {
                         saveAllSamples(context, tempRecordedGestures)

@@ -10,10 +10,6 @@ import kotlin.math.sqrt
  * Zaktualizowany o obsługę Multi-Sample (k-NN dla DTW).
  */
 object GestureRecognizer {
-
-    // Domyślny próg (można go nadpisywać w UI)
-    const val DTW_THRESHOLD = 100.0
-
     /**
      * Analizuje gest wejściowy porównując go z całą LISTĄ próbek treningowych.
      * Zwraca wynik najlepszego dopasowania (najmniejszy dystans).
@@ -52,19 +48,6 @@ object GestureRecognizer {
         Log.d("GestureRecognizer", "Najlepszy wynik (spośród ${trainingSet.size} próbek): $bestTotalDistance")
         return bestTotalDistance
     }
-
-    /**
-     * Stara funkcja dla kompatybilności (pojedynczy wzorzec).
-     */
-    fun analyzeGesture(
-        savedGesture: Gesture,
-        liveAccel: List<SensorSample>,
-        liveGyro: List<SensorSample>
-    ): Double {
-        return recognizeGesture(listOf(savedGesture), liveAccel, liveGyro)
-    }
-
-    // --- FUNKCJE POMOCNICZE (MATH) ---
 
     private fun slidingWindowDTW(saved: List<Float>, live: List<Float>): Double {
         if (saved.isEmpty() || live.isEmpty()) return Double.POSITIVE_INFINITY

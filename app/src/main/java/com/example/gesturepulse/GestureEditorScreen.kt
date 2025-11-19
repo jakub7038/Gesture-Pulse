@@ -8,12 +8,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -60,7 +60,6 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
 
     // tester TODO: coś z nim jest nie tak, ale szzcerze nie wiem co
     var isRecordingTest by remember { mutableStateOf(false) }
-    var testStatusText by remember { mutableStateOf("Ustaw suwaki i przetestuj") }
     var lastTestScore by remember { mutableDoubleStateOf(0.0) }
     var lastTestSuccess by remember { mutableStateOf<Boolean?>(null) }
     val liveAccel = remember { mutableStateListOf<SensorSample>() }
@@ -108,7 +107,7 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
             TopAppBar(
                 title = { Text("Edycja: $gestureName") },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, "Wróć") }
+                    IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Wróć") }
                 },
                 actions = {
                     IconButton(onClick = {
@@ -167,13 +166,13 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 IconButton(onClick = { if (selectedVariantIndex > 0) selectedVariantIndex-- }, enabled = selectedVariantIndex > 0) {
-                                    Icon(Icons.Default.KeyboardArrowLeft, "Poprzedni")
+                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Poprzedni")
                                 }
 
                                 Text("Wariant ${selectedVariantIndex + 1}", fontWeight = FontWeight.Bold)
 
                                 IconButton(onClick = { if (selectedVariantIndex < variants.size - 1) selectedVariantIndex++ }, enabled = selectedVariantIndex < variants.size - 1) {
-                                    Icon(Icons.Default.KeyboardArrowRight, "Następny")
+                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Następny")
                                 }
 
                                 Spacer(Modifier.width(8.dp))
@@ -202,7 +201,7 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                                 }
                             }
 
-                            Divider(Modifier.padding(vertical = 8.dp))
+                            HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
                             // WYKRES
                             View2D(
@@ -289,7 +288,6 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                     onClick = {
                         if (!isRecordingTest) {
                             isRecordingTest = true
-                            testStatusText = "Nagrywanie."
                             lastTestSuccess = null
                         } else {
                             isRecordingTest = false

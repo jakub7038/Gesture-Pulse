@@ -3,7 +3,6 @@ package com.example.gesturepulse
 import android.content.Context
 import android.util.Log
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 

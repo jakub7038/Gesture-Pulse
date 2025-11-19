@@ -17,7 +17,9 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import kotlinx.coroutines.delay
 
-private sealed class GameState {
+// --- STAN GRY oraz logika ---
+
+sealed class GameState {
     object Idle : GameState()
     data class Countdown(val commandName: String, val variants: List<Gesture>, val timeLeft: Int) : GameState()
     data class Recording(val commandName: String, val variants: List<Gesture>) : GameState()
@@ -27,35 +29,34 @@ private sealed class GameState {
 }
 
 @Composable
-fun GameScreen(navController: NavController, sensorHandler: SensorHandler) {
-    val context = LocalContext.current
-    var score by remember { mutableIntStateOf(0) }
-    var gameState by remember { mutableStateOf<GameState>(GameState.Idle) }
-
-    var allCommandsMap by remember { mutableStateOf<Map<String, List<Gesture>>>(emptyMap()) }
-
+fun rememberGameController(
+    context: Context,
+    sensorHandler: SensorHandler,
+    navController: NavController
+): GameController {
+    val score = remember { mutableIntStateOf(0) }
+    val gameState = remember { mutableStateOf<GameState>(GameState.Idle) }
+    val allCommandsMap = remember { mutableStateOf<Map<String, List<Gesture>>>(emptyMap()) }
     val liveAccelData = remember { mutableStateListOf<SensorSample>() }
     val liveGyroData = remember { mutableStateListOf<SensorSample>() }
 
-    var showSaveScoreDialog by remember { mutableStateOf(false) }
-    var scoreSaved by remember { mutableStateOf(false) }
-
+    // Wczytanie gestów przy starcie
     LaunchedEffect(Unit) {
         val loaded = GestureDataManager.loadAllGestures(context)
-        allCommandsMap = loaded.groupBy { it.name }
+        allCommandsMap.value = loaded.groupBy { it.name }
     }
 
-    // logika gry
-    LaunchedEffect(gameState) {
-        when (val state = gameState) {
+    // GŁÓWNA PĘTLA LOGIKI GRY
+    LaunchedEffect(gameState.value) {
+        when (val state = gameState.value) {
             is GameState.Idle -> {}
 
             is GameState.Countdown -> {
                 if (state.timeLeft > 0) {
                     delay(1000)
-                    gameState = state.copy(timeLeft = state.timeLeft - 1)
+                    gameState.value = state.copy(timeLeft = state.timeLeft - 1)
                 } else {
-                    gameState = GameState.Recording(state.commandName, state.variants)
+                    gameState.value = GameState.Recording(state.commandName, state.variants)
                 }
             }
 
@@ -77,35 +78,104 @@ fun GameScreen(navController: NavController, sensorHandler: SensorHandler) {
                     liveGyro = liveGyroData.toList()
                 )
                 val success = totalDistance < difficultyThreshold
-                gameState = GameState.ShowResult(success, totalDistance, difficultyThreshold.toFloat())
+                gameState.value = GameState.ShowResult(success, totalDistance, difficultyThreshold.toFloat())
             }
 
             is GameState.ShowResult -> {
                 delay(2000)
                 if (state.success) {
-                    score++
-                    if (allCommandsMap.isNotEmpty()) {
-                        val nextKey = allCommandsMap.keys.random()
-                        gameState = GameState.Countdown(nextKey, allCommandsMap[nextKey]!!, 2)
+                    score.intValue++
+                    if (allCommandsMap.value.isNotEmpty()) {
+                        val nextKey = allCommandsMap.value.keys.random()
+                        gameState.value = GameState.Countdown(nextKey, allCommandsMap.value[nextKey]!!, 2)
                     } else {
-                        gameState = GameState.GameOver
+                        // Nie powinno się zdarzyć, ale na wszelki wypadek
+                        gameState.value = GameState.GameOver
                     }
                 } else {
                     vibrate(context)
-                    gameState = GameState.GameOver
+                    gameState.value = GameState.GameOver
                 }
             }
 
-            else -> {}
+            is GameState.GameOver -> {
+            }
         }
     }
 
-    // ui gry
+    return remember(score, gameState, allCommandsMap) {
+        GameController(
+            score = score,
+            gameState = gameState,
+            allCommandsMap = allCommandsMap,
+            context = context,
+            navController = navController
+        )
+    }
+}
+
+// stan gry
+class GameController(
+    private val score: MutableIntState,
+    private val gameState: MutableState<GameState>,
+    private val allCommandsMap: State<Map<String, List<Gesture>>>,
+    private val context: Context,
+    private val navController: NavController
+) {
+    val currentScore: Int by score
+    val currentState: GameState by gameState
+    val hasGestures: Boolean
+        get() = allCommandsMap.value.isNotEmpty()
+
+    fun startGame() {
+        if (allCommandsMap.value.isNotEmpty()) {
+            score.intValue = 0
+            val k = allCommandsMap.value.keys.random()
+            gameState.value = GameState.Countdown(k, allCommandsMap.value[k]!!, 2)
+        }
+    }
+
+    fun stopRecording() {
+        if (gameState.value is GameState.Recording) {
+            val state = gameState.value as GameState.Recording
+            gameState.value = GameState.Analyzing(state.commandName, state.variants)
+        }
+    }
+
+    fun restartGame() {
+        score.intValue = 0
+        gameState.value = GameState.Idle
+    }
+
+    fun saveScore(playerName: String, finalScore: Int) {
+        ScoreDataManager.addScore(context, ScoreEntry(playerName, finalScore))
+    }
+
+    fun exitGame() {
+        navController.popBackStack()
+    }
+}
+
+// UI
+@Composable
+fun GameScreen(navController: NavController, sensorHandler: SensorHandler) {
+    val context = LocalContext.current
+    val controller = rememberGameController(context, sensorHandler, navController)
+
+    GameScreenContent(controller)
+}
+
+@Composable
+private fun GameScreenContent(controller: GameController) {
+    val state = controller.currentState
+    var showSaveScoreDialog by remember { mutableStateOf(false) }
+    var scoreSaved by remember { mutableStateOf(false) }
+
     Box(Modifier.fillMaxSize()) {
 
-        if (gameState !is GameState.GameOver && gameState !is GameState.Idle) {
+        if (state !is GameState.GameOver && state !is GameState.Idle) {
             Text(
-                "Punkty: $score",
+                "Punkty: ${controller.currentScore}",
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
@@ -121,157 +191,146 @@ fun GameScreen(navController: NavController, sensorHandler: SensorHandler) {
                 .fillMaxSize()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center // <--- TO KLUCZ DO CENTROWANIA PIONOWEGO
+            verticalArrangement = Arrangement.Center
         ) {
 
-            // ekran startowy
-            if (gameState is GameState.Idle) {
-                Text(
-                    "Gotowy?",
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.height(32.dp))
+            when (state) {
+                // ekran startowy
+                is GameState.Idle -> {
+                    Text(
+                        "Gotowy?",
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(32.dp))
 
-                if (allCommandsMap.isEmpty()) {
-                    Text("Brak nagranych gestów!\nIdź do menu i nagraj coś.", textAlign = TextAlign.Center)
-                } else {
+                    if (!controller.hasGestures) {
+                        Text("Brak nagranych gestów!.", textAlign = TextAlign.Center)
+                    } else {
+                        Button(
+                            onClick = { controller.startGame() },
+                            modifier = Modifier.fillMaxWidth(0.6f).height(60.dp)
+                        ) {
+                            Text("START", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                // time
+                is GameState.Countdown -> {
+                    Text("Wykonaj:", fontSize = 24.sp, color = Color.Gray)
+                    Spacer(Modifier.height(16.dp))
+
+                    Text(
+                        state.commandName,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 52.sp
+                    )
+
+                    Spacer(Modifier.height(64.dp))
+
+                    Text(
+                        if(state.timeLeft > 0) "${state.timeLeft}..." else "START!",
+                        fontSize = 64.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text("Ustaw telefon...", fontSize = 16.sp, color = Color.Gray)
+                }
+
+                // stopowanie przez przycisk
+                is GameState.Recording -> {
                     Button(
-                        onClick = {
-                            val k = allCommandsMap.keys.random()
-                            gameState = GameState.Countdown(k, allCommandsMap[k]!!, 2)
-                        },
-                        modifier = Modifier.fillMaxWidth(0.6f).height(60.dp)
+                        onClick = { controller.stopRecording() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                            .padding(16.dp),
+                        shape = MaterialTheme.shapes.extraLarge
                     ) {
-                        Text("START", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text("RUCH TRWA...", fontSize = 18.sp)
+                            Spacer(Modifier.height(16.dp))
+                            Text("ZAKOŃCZ", fontSize = 40.sp, fontWeight = FontWeight.Black)
+                        }
                     }
                 }
-            }
 
-            // time
-            else if (gameState is GameState.Countdown) {
-                val state = gameState as GameState.Countdown
+                // analiza
+                is GameState.Analyzing -> {
+                    Text("Analizowanie...", fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(32.dp))
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(64.dp),
+                        strokeWidth = 6.dp
+                    )
+                }
 
-                Text("Wykonaj:", fontSize = 24.sp, color = Color.Gray)
-                Spacer(Modifier.height(16.dp))
+                // wyniki
+                is GameState.ShowResult -> {
+                    val color = if (state.success) Color(0xFF2E7D32) else Color.Red
+                    val text = if (state.success) "DOSKONALE!" else "PUDŁO!"
 
-                Text(
-                    state.commandName,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 52.sp
-                )
+                    Text(text, fontSize = 56.sp, fontWeight = FontWeight.Black, color = color)
 
-                Spacer(Modifier.height(64.dp))
+                    Spacer(Modifier.height(24.dp))
+                    Text("Wynik: ${"%.1f".format(state.score)}", fontSize = 24.sp)
+                    Text("Limit błędu: ${state.threshold.toInt()}", fontSize = 16.sp, color = Color.Gray)
+                }
 
-                Text(
-                    if(state.timeLeft > 0) "${state.timeLeft}..." else "START!",
-                    fontSize = 64.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                Text("Ustaw telefon...", fontSize = 16.sp, color = Color.Gray)
-            }
+                // game over
+                is GameState.GameOver -> {
+                    Text("KONIEC GRY", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Color.Red)
+                    Spacer(Modifier.height(16.dp))
+                    Text("Twój wynik:", fontSize = 20.sp)
+                    Text("${controller.currentScore}", fontSize = 80.sp, fontWeight = FontWeight.Bold)
 
-            // stopowanie przez przycisk
-            else if (gameState is GameState.Recording) {
-                val state = gameState as GameState.Recording
+                    Spacer(Modifier.height(48.dp))
 
-                Button(
-                    onClick = {
-                        gameState = GameState.Analyzing(state.commandName, state.variants)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                        .padding(16.dp),
-                    shape = MaterialTheme.shapes.extraLarge
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text("RUCH TRWA...", fontSize = 18.sp)
-                        Spacer(Modifier.height(16.dp))
-                        Text("ZAKOŃCZ", fontSize = 40.sp, fontWeight = FontWeight.Black)
+                    Button(
+                        onClick = { controller.restartGame() },
+                        modifier = Modifier.fillMaxWidth(0.7f).height(50.dp)
+                    ) { Text("Zagraj Ponownie") }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    if (!scoreSaved && controller.currentScore > 0) {
+                        OutlinedButton(
+                            onClick = { showSaveScoreDialog = true },
+                            modifier = Modifier.fillMaxWidth(0.7f)
+                        ) { Text("Zapisz Wynik") }
                     }
+
+                    Spacer(Modifier.height(16.dp))
+                    TextButton(onClick = { controller.exitGame() }) { Text("Wyjdź") }
                 }
-            }
-
-            // analiza, nie wiem czemu czasami dalej długo zajmuje
-            else if (gameState is GameState.Analyzing) {
-                Text("Analizowanie...", fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(32.dp))
-                CircularProgressIndicator(
-                    modifier = Modifier.size(64.dp),
-                    strokeWidth = 6.dp
-                )
-            }
-
-            // wyniki
-            else if (gameState is GameState.ShowResult) {
-                val state = gameState as GameState.ShowResult
-                val color = if (state.success) Color(0xFF2E7D32) else Color.Red
-                val text = if (state.success) "DOSKONALE!" else "PUDŁO!"
-
-                Text(text, fontSize = 56.sp, fontWeight = FontWeight.Black, color = color)
-
-                Spacer(Modifier.height(24.dp))
-                Text("Wynik: ${"%.1f".format(state.score)}", fontSize = 24.sp)
-                Text("Limit błędu: ${state.threshold.toInt()}", fontSize = 16.sp, color = Color.Gray)
-            }
-
-            // game over
-            else if (gameState is GameState.GameOver) {
-                Text("KONIEC GRY", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Color.Red)
-                Spacer(Modifier.height(16.dp))
-                Text("Twój wynik:", fontSize = 20.sp)
-                Text("$score", fontSize = 80.sp, fontWeight = FontWeight.Bold)
-
-                Spacer(Modifier.height(48.dp))
-
-                Button(
-                    onClick = {
-                        score = 0
-                        scoreSaved = false
-                        gameState = GameState.Idle
-                    },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(50.dp)
-                ) { Text("Zagraj Ponownie") }
-
-                Spacer(Modifier.height(16.dp))
-
-                if (!scoreSaved) {
-                    OutlinedButton(
-                        onClick = { showSaveScoreDialog = true },
-                        modifier = Modifier.fillMaxWidth(0.7f)
-                    ) { Text("Zapisz Wynik") }
-                }
-
-                Spacer(Modifier.height(16.dp))
-                TextButton(onClick = { navController.popBackStack() }) { Text("Wyjdź") }
             }
         }
     }
 
-    // zapis
+    // dialog zapisu
     if (showSaveScoreDialog) {
         var playerName by remember { mutableStateOf("") }
+        val finalScore = controller.currentScore
         AlertDialog(
             onDismissRequest = { showSaveScoreDialog = false },
             title = { Text("Zapisz Wynik") },
             text = {
                 Column {
-                    Text("Wynik: $score")
+                    Text("Wynik: $finalScore")
                     OutlinedTextField(value = playerName, onValueChange = { playerName = it }, label = { Text("Imię") })
                 }
             },
             confirmButton = {
                 Button(onClick = {
-                    ScoreDataManager.addScore(context, ScoreEntry(playerName, score))
+                    controller.saveScore(playerName, finalScore)
                     scoreSaved = true
                     showSaveScoreDialog = false
                 }) { Text("Zapisz") }
@@ -285,5 +344,5 @@ private fun vibrate(context: Context) {
     try {
         val v = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
         v.defaultVibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
-    } catch (e: Exception) {}
+    } catch (_: Exception) {}
 }
