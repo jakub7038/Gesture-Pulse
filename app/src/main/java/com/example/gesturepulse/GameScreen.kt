@@ -236,14 +236,15 @@ private fun GameScreenContent(controller: GameController) {
 
                     Text(
                         //  Pobieramy nazwę z obiektu Command
-                        state.command.name,
+                        text = state.command.name,
                         fontSize = 48.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Black,
                         textAlign = TextAlign.Center,
-                        lineHeight = 52.sp
+                        lineHeight = 52.sp,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
 
-                    Spacer(Modifier.height(64.dp))
+                    Spacer(Modifier.height(48.dp))
 
                     Text(
                         if(state.timeLeft > 0) "${state.timeLeft}..." else "START!",
@@ -251,7 +252,9 @@ private fun GameScreenContent(controller: GameController) {
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.secondary
                     )
-                    Text("Ustaw telefon...", fontSize = 16.sp, color = Color.Gray)
+
+                    Spacer(Modifier.height(8.dp))
+                    Text("Ustaw telefon...", fontSize = 14.sp, color = Color.Gray)
                 }
 
                 // stopowanie przez przycisk
@@ -288,7 +291,7 @@ private fun GameScreenContent(controller: GameController) {
 
                 // wyniki
                 is GameState.ShowResult -> {
-                    val color = if (state.success) Color(0xFF2E7D32) else Color.Red
+                    val color = if (state.success) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
                     val text = if (state.success) "DOSKONALE!" else "PUDŁO!"
 
                     Text(text, fontSize = 56.sp, fontWeight = FontWeight.Black, color = color)

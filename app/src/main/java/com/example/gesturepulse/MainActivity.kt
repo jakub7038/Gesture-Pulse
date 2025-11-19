@@ -116,84 +116,105 @@ fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) 
         Text(
             text = "Gesture Pulse",
             fontSize = 40.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            fontWeight = FontWeight.Black,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Text(
+            text = "v1.0.0.1",
+            fontSize = 16.sp,
+            color = Color.Gray,
+            fontWeight = FontWeight.Normal
         )
 
         Spacer(modifier = Modifier.height(48.dp))
 
         MenuButton(
-            text = "Graj",
-            onClick = { navController.navigate("game") }
+            text = "GRAJ",
+            onClick = { navController.navigate("game") },
+            color = MaterialTheme.colorScheme.primary,
+            textColor = Color.Black
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         MenuButton(
             text = "Nagraj gest",
             onClick = {
                 navController.navigate("record_gesture")
-            }
+            },
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            textColor = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         MenuButton(
-            text = "Moje Gesty (Edycja)",
-            onClick = {
-                navController.navigate("gesture_list")
-            }
+            text = "Edytor Gestów",
+            onClick = { navController.navigate("gesture_list") },
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            textColor = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         MenuButton(
             text = "Rankingi",
-            onClick = { navController.navigate("rankings") }
+            onClick = { navController.navigate("rankings") },
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            textColor = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         MenuButton(
             text = "Ustawienia",
-            onClick = {
-                //TODO: logika
-            }
+            onClick = { /*TODO: navController.navigate("settings")*/ },
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            textColor = MaterialTheme.colorScheme.onSurface
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
+        // WYJŚCIE (Mniej widoczne)
         MenuButton(
             text = "Wyjście",
             onClick = {
                 activity?.finish()
-            }
+            },
+            color = Color.Transparent,
+            textColor = Color.Gray
         )
     }
 }
 
 @Composable
-fun MenuButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val buttonModifier = modifier.fillMaxWidth()
+fun MenuButton(
+    text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary, textColor: Color = Color.Black
+) {
+    val buttonModifier = modifier
+        .fillMaxWidth()
         .padding(horizontal = 32.dp)
         .height(60.dp)
 
-    val buttonShape = RoundedCornerShape(16.dp)
-
-    val colors = ButtonDefaults.buttonColors(
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary
-    )
-
-    val fontWeight = FontWeight.Bold
+    val border = if (color == Color.Transparent) {
+        ButtonDefaults.outlinedButtonBorder(enabled = true)
+    } else {
+        null
+    }
 
     Button(
         onClick = onClick,
         modifier = buttonModifier,
-        shape = buttonShape,
-        colors = colors
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (color == Color.Transparent) Color.Transparent else color,
+            contentColor = textColor
+        ),
+        border = border
     ) {
-        Text(text, fontSize = 20.sp, fontWeight = fontWeight)
+        Text(text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
     }
 }
 

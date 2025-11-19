@@ -217,7 +217,11 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                             Slider(
                                 value = trimStartIndex,
                                 onValueChange = { trimStartIndex = it.coerceAtMost(trimEndIndex - 5f) },
-                                valueRange = 0f..maxDataSize
+                                valueRange = 0f..maxDataSize,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.secondary,
+                                    activeTrackColor = MaterialTheme.colorScheme.secondary
+                                )
                             )
 
                             Text("Koniec przycięcia", fontSize = 12.sp, color = Color.Gray)
@@ -289,7 +293,10 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                             lastTestSuccess = score < currentThreshold
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = if(isRecordingTest) Color.Red else MaterialTheme.colorScheme.secondary),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if(isRecordingTest) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
+                        contentColor = Color.Black
+                    ),
                     modifier = Modifier.fillMaxWidth().height(50.dp)
                 ) {
                     Icon(if(isRecordingTest) Icons.Default.PlayArrow else Icons.Default.Refresh, null)
@@ -313,6 +320,11 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
 @Composable
 fun View2D(accelData: List<SensorSample>, gyroData: List<SensorSample>, startIdx: Int, endIdx: Int, modifier: Modifier = Modifier) {
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+
     Box(modifier.onSizeChanged { canvasSize = it }) {
         Canvas(Modifier.fillMaxSize()) {
             val w = canvasSize.width.toFloat(); val h = canvasSize.height.toFloat()
@@ -342,9 +354,9 @@ fun View2D(accelData: List<SensorSample>, gyroData: List<SensorSample>, startIdx
                 val clipStart = startIdx * stepX
                 val clipEnd = endIdx * stepX
                 clipRect(clipStart, top, clipEnd, top + height) {
-                    drawPath(path { it.x }, if(top==0f) Color.Red else Color(0xFFFFA500), style = Stroke(3f))
-                    drawPath(path { it.y }, if(top==0f) Color.Green else Color.Cyan, style = Stroke(3f))
-                    drawPath(path { it.z }, if(top==0f) Color.Blue else Color.Magenta, style = Stroke(3f))
+                    drawPath(path { it.x }, if(top==0f) primaryColor else primaryColor.copy(alpha=0.7f), style = Stroke(3f))
+                    drawPath(path { it.y }, if(top==0f) secondaryColor else secondaryColor.copy(alpha=0.7f), style = Stroke(3f))
+                    drawPath(path { it.z }, if(top==0f) tertiaryColor else tertiaryColor.copy(alpha=0.7f), style = Stroke(3f))
                 }
             }
 

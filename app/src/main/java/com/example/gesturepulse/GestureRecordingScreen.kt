@@ -15,6 +15,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun GestureRecordingScreen(
@@ -46,6 +48,8 @@ fun GestureRecordingScreen(
     var gestureName by remember { mutableStateOf("") }
     var isRecording by remember { mutableStateOf(false) }
 
+    val existingGestureNames = remember { mutableStateListOf<String>() }
+
     val minimumSteps = 3
 
     // Komenda budowana
@@ -57,6 +61,15 @@ fun GestureRecordingScreen(
     // bufory na dane sensora
     val accelData = remember { mutableStateListOf<SensorSample>() }
     val gyroData = remember { mutableStateListOf<SensorSample>() }
+
+    LaunchedEffect(Unit) {
+        val allGestures = GestureDataManager.loadAllGestures(context)
+        existingGestureNames.addAll(allGestures.map { it.name.lowercase().trim() })
+    }
+
+    val isNameTaken = remember(gestureName) {
+        existingGestureNames.contains(gestureName.trim().lowercase())
+    }
 
     //  obsługa sensora
     DisposableEffect(isRecording) {
@@ -99,6 +112,8 @@ fun GestureRecordingScreen(
         LinearProgressIndicator(
             progress = { currentVariantCount.toFloat().coerceAtMost(minimumSteps.toFloat()) / minimumSteps.toFloat() },
             modifier = Modifier.fillMaxWidth().height(8.dp),
+            color = MaterialTheme.colorScheme.tertiary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
         Text(
             "Postęp: Wariant ${currentVariantCount + 1} z minimum $minimumSteps",
@@ -106,7 +121,7 @@ fun GestureRecordingScreen(
             color = Color.Gray
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         // Pole nazwy
         OutlinedTextField(
@@ -115,7 +130,18 @@ fun GestureRecordingScreen(
             label = { Text("Nazwa gestu (np. Wymach)") },
             modifier = Modifier.fillMaxWidth(),
             enabled = currentVariantCount == 0 && !isRecording,
-            singleLine = true
+            singleLine = true,
+            isError = isNameTaken,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.tertiary,
+                focusedLabelColor = MaterialTheme.colorScheme.tertiary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.tertiary
+            ),
+            supportingText = {
+                if (isNameTaken) {
+                    Text("Taka nazwa gestu już istnieje!", color = MaterialTheme.colorScheme.error)
+                }
+            }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -141,7 +167,7 @@ fun GestureRecordingScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        val buttonColor = if (isRecording) Color.Red else MaterialTheme.colorScheme.primary
+        val buttonColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
 
         val canSave = currentVariantCount >= minimumSteps && !isRecording
 
@@ -150,6 +176,11 @@ fun GestureRecordingScreen(
             onClick = {
                 if (gestureName.isBlank()) {
                     Toast.makeText(context, "Najpierw podaj nazwę gestu!", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+
+                if (currentVariantCount == 0 && isNameTaken) {
+                    Toast.makeText(context, "Nazwa zajęta! Wybierz inną.", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
 
@@ -185,10 +216,11 @@ fun GestureRecordingScreen(
                     Toast.makeText(context, "Próbka zapisana. Dodano wariant ${currentVariantCount + 1}.", Toast.LENGTH_SHORT).show()
                 }
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(80.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = buttonColor)
+            modifier = Modifier.fillMaxWidth().height(80.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = buttonColor,
+                contentColor = Color.Black
+            )
         ) {
             Text(
                 if (isRecording) "STOP"
@@ -214,7 +246,10 @@ fun GestureRecordingScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(60.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiary,
+                    contentColor = Color.Black
+                )
             ) {
                 Text(
                     "ZAPISZ GEST ($currentVariantCount warianty)",
