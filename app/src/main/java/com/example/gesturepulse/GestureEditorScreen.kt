@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.gesturepulse.ui.theme.NeonRed
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -43,7 +44,7 @@ import kotlin.math.roundToInt
 @Composable
 fun GestureEditorScreen(navController: NavController, gestureName: String, sensorHandler: SensorHandler) {
     val context = LocalContext.current
-    
+
     var command by remember { mutableStateOf<Command?>(null) }
     var variants by remember { mutableStateOf(listOf<Gesture>()) }
     var currentThreshold by remember { mutableFloatStateOf(20.0f) }
@@ -54,8 +55,7 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
     var isChartExpanded by remember { mutableStateOf(true) }
 
     // suwaki przycinania
-    var trimStartIndex by remember { mutableFloatStateOf(0f) }
-    var trimEndIndex by remember { mutableFloatStateOf(100f) }
+    var trimRange by remember { mutableStateOf(0f..100f) } // MODIFIED to a single range
     var maxDataSize by remember { mutableFloatStateOf(100f) }
 
     // tester TODO: coś z nim jest nie tak, ale szzcerze nie wiem co
@@ -73,8 +73,7 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
 
             val g = gestures[safeIndex]
             maxDataSize = g.accelerometerData.size.toFloat().coerceAtLeast(1f)
-            trimStartIndex = 0f
-            trimEndIndex = maxDataSize
+            trimRange = 0f..maxDataSize // Initialize range to max
         }
     }
 
@@ -206,37 +205,38 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                             View2D(
                                 accelData = currentVariant.accelerometerData,
                                 gyroData = currentVariant.gyroscopeData,
-                                startIdx = trimStartIndex.roundToInt(),
-                                endIdx = trimEndIndex.roundToInt(),
+                                startIdx = trimRange.start.roundToInt(),
+                                endIdx = trimRange.endInclusive.roundToInt(),
                                 modifier = Modifier.height(220.dp).fillMaxWidth().background(Color.Black.copy(0.05f))
                             )
 
                             Spacer(Modifier.height(16.dp))
 
-                            Text("Początek przycięcia", fontSize = 12.sp, color = Color.Gray)
-                            Slider(
-                                value = trimStartIndex,
-                                onValueChange = { trimStartIndex = it.coerceAtMost(trimEndIndex - 5f) },
-                                valueRange = 0f..maxDataSize,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = MaterialTheme.colorScheme.secondary,
-                                    activeTrackColor = MaterialTheme.colorScheme.secondary
-                                )
-                            )
+                            Text("Przycinanie Próbki", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Zakres: ${trimRange.start.roundToInt()} - ${trimRange.endInclusive.roundToInt()}", fontSize = 12.sp, color = Color.Gray)
 
-                            Text("Koniec przycięcia", fontSize = 12.sp, color = Color.Gray)
-                            Slider(
-                                value = trimEndIndex,
-                                onValueChange = { trimEndIndex = it.coerceAtLeast(trimStartIndex + 5f) },
-                                valueRange = 0f..maxDataSize
+                            RangeSlider(
+                                value = trimRange,
+                                onValueChange = { newRange ->
+                                    if (newRange.endInclusive - newRange.start >= 5f) {
+                                        trimRange = newRange
+                                    }
+                                },
+                                valueRange = 0f..maxDataSize,
+                                steps = maxDataSize.toInt().coerceAtLeast(1),
+                                colors = SliderDefaults.colors(
+                                    activeTrackColor = MaterialTheme.colorScheme.tertiary,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.error,
+                                    thumbColor = MaterialTheme.colorScheme.tertiary
+                                )
                             )
 
                             Spacer(Modifier.height(8.dp))
 
                             Button(
                                 onClick = {
-                                    val s = trimStartIndex.toInt()
-                                    val e = trimEndIndex.toInt()
+                                    val s = trimRange.start.toInt()
+                                    val e = trimRange.endInclusive.toInt()
                                     if (s < e && currentVariant.accelerometerData.size > e) {
                                         val newAccel = currentVariant.accelerometerData.subList(s, e)
                                         if (newAccel.isNotEmpty()) {
@@ -267,12 +267,18 @@ fun GestureEditorScreen(navController: NavController, gestureName: String, senso
                 // suwak trudności
                 Text("Trudność dla '$gestureName'", fontWeight = FontWeight.Bold, fontSize = 18.sp)
 
-                Text("${currentThreshold.toInt()}", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("${currentThreshold.toInt()}", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
                 Slider(
                     value = currentThreshold,
                     onValueChange = { currentThreshold = it; hasChanges = true },
                     valueRange = 5f..100f,
-                    steps = 94
+                    steps = 94,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.tertiary,
+                        activeTrackColor = MaterialTheme.colorScheme.tertiary,
+                        activeTickColor = MaterialTheme.colorScheme.onTertiary,
+                        inactiveTickColor = MaterialTheme.colorScheme.secondary
+                    )
                 )
                 Text("5 = Bardzo Trudny | 100 = Bardzo Łatwy", fontSize = 12.sp, color = Color.Gray)
                 Text("(Ta wartość dotyczy tylko gestu '$gestureName')", fontSize = 10.sp, color = Color.Gray)

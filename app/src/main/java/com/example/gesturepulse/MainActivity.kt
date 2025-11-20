@@ -9,8 +9,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -110,86 +114,98 @@ fun MainMenuScreen(navController: NavController, modifier: Modifier = Modifier) 
     val context = LocalContext.current
     val activity = context.findActivity()
 
-    Column(
+    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 16.dp)
     ) {
 
-        Text(
-            text = "Gesture Pulse",
-            fontSize = 40.sp,
-            fontWeight = FontWeight.Black,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        Text(
-            text = "v1.0.0.1",
-            fontSize = 16.sp,
-            color = Color.Gray,
-            fontWeight = FontWeight.Normal
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        MenuButton(
-            text = "GRAJ",
-            onClick = { navController.navigate("game") },
-            color = MaterialTheme.colorScheme.primary,
-            textColor = Color.Black
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        MenuButton(
-            text = "Nagraj gest",
-            onClick = {
-                navController.navigate("record_gesture")
-            },
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            textColor = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        MenuButton(
-            text = "Edytor Gestów",
-            onClick = { navController.navigate("gesture_list") },
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            textColor = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        MenuButton(
-            text = "Rankingi",
-            onClick = { navController.navigate("rankings") },
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            textColor = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        MenuButton(
-            text = "Ustawienia",
+        IconButton(
             onClick = { navController.navigate("settings") },
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            textColor = MaterialTheme.colorScheme.onSurface
-        )
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 8.dp, end = 0.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Settings,
+                contentDescription = "Ustawienia",
+                tint = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.size(32.dp)
+            )
+        }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = statusBarHeight + 40.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Gesture Pulse",
+                fontSize = 40.sp,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onBackground
+            )
 
-        // WYJŚCIE (Mniej widoczne)
-        MenuButton(
-            text = "Wyjście",
-            onClick = {
-                activity?.finish()
-            },
-            color = Color.Transparent,
-            textColor = Color.Gray
-        )
+            Text(
+                text = "v1.0.0.1",
+                fontSize = 16.sp,
+                color = Color.Gray,
+                fontWeight = FontWeight.Normal
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            MenuButton(
+                text = "GRAJ",
+                onClick = { navController.navigate("game") },
+                color = MaterialTheme.colorScheme.primary,
+                textColor = Color.Black
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            MenuButton(
+                text = "Nagraj gest",
+                onClick = { navController.navigate("record_gesture") },
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                textColor = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            MenuButton(
+                text = "Edytor Gestów",
+                onClick = { navController.navigate("gesture_list") },
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                textColor = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            MenuButton(
+                text = "Rankingi",
+                onClick = { navController.navigate("rankings") },
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                textColor = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // WYJŚCIE
+            MenuButton(
+                text = "Wyjście",
+                onClick = { activity?.finish() },
+                color = Color.Transparent,
+                textColor = Color.Gray
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+        }
     }
 }
 
