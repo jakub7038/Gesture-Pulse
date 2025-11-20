@@ -145,4 +145,19 @@ object GestureDataManager {
             }
         }
     }
+
+    fun resetToDefaults(context: Context) {
+        try {
+            val inputStream = context.resources.openRawResource(R.raw.default_gestures)
+            val content = inputStream.bufferedReader().use { it.readText() }
+
+            val defaultCommands: List<Command> = json.decodeFromString(content)
+
+            saveAllGestures(context, defaultCommands)
+            Log.d("GestureDataManager", "Przywrócono gesty domyślne: ${defaultCommands.size} komend")
+
+        } catch (e: Exception) {
+            Log.e("GestureDataManager", "Błąd resetowania do domyślnych", e)
+        }
+    }
 }

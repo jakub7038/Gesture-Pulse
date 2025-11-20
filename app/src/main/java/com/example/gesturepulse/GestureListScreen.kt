@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import android.widget.Toast
 
 @Composable
 fun GestureListScreen(navController: NavController) {
@@ -23,6 +25,7 @@ fun GestureListScreen(navController: NavController) {
     var commands by remember { mutableStateOf(listOf<Command>()) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var commandNameToDelete by remember { mutableStateOf<String?>(null) }
+    var showResetDialog by remember { mutableStateOf(false) }
 
     fun refreshGestures() {
         commands = GestureDataManager.loadAllGestures(context)
@@ -37,10 +40,28 @@ fun GestureListScreen(navController: NavController) {
             .padding(16.dp)
     )
     {
-        Text("Zarządzanie Gestami", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Zarządzanie Gestami", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+
+            IconButton(onClick = { showResetDialog = true }) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Przywróć domyślne",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
         Spacer(Modifier.height(16.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.weight(1f)
+        ) {
             items(commands) { command ->
                 Card(Modifier.fillMaxWidth()) {
                     Row(
@@ -84,6 +105,30 @@ fun GestureListScreen(navController: NavController) {
             },
             dismissButton = {
                 Button(onClick = { showDeleteDialog = false }) { Text("Anuluj") }
+            }
+        )
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Przywróć domyślne") },
+            text = {
+                Text("Czy na pewno chcesz usunąć WSZYSTKIE swoje gesty i wczytać zestaw fabryczny?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        GestureDataManager.resetToDefaults(context)
+                        refreshGestures()
+                        showResetDialog = false
+                        Toast.makeText(context, "Przywrócono gesty!", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Przywróć") }
+            },
+            dismissButton = {
+                Button(onClick = { showResetDialog = false }) { Text("Anuluj") }
             }
         )
     }

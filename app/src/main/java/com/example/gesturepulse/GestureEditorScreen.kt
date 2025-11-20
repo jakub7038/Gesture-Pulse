@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.gesturepulse.ui.theme.NeonRed
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
