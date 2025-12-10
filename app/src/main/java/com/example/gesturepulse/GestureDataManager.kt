@@ -11,6 +11,14 @@ const val GESTURE_FILE_NAME = "my_gestures.json"
 /**
  * Definicja pojedynczej próbki danych z sensora.
  */
+
+//no i jeszcze to klikanie
+enum class CommandType {
+    MOTION,
+    MASHING,
+    DONT_TAP
+}
+
 @Serializable
 data class SensorSample(
     val timestamp: Long,
@@ -37,7 +45,8 @@ data class Gesture(
 @Serializable
 data class Command(
     val name: String,
-    val variants: MutableList<Gesture>,
+    val type: CommandType = CommandType.MOTION,
+    val variants: MutableList<Gesture> = mutableListOf(),
     val threshold: Float = 20.0f //margines błędu
 )
 
@@ -51,8 +60,13 @@ object GestureDataManager {
 
     //READ
     fun loadAllGestures(context: Context): MutableList<Command> {
+        val file = File(context.filesDir, GESTURE_FILE_NAME)
+        if (!file.exists()) {
+            Log.d("GestureDataManager", "Pierwsze uruchomienie: Inicjalizacja gestów domyślnych.")
+            resetToDefaults(context)
+        }
+
         return try {
-            val file = File(context.filesDir, GESTURE_FILE_NAME)
             if (!file.exists()) {
                 return mutableListOf()
             }
@@ -64,7 +78,7 @@ object GestureDataManager {
         }
     }
 
-    //CREATE
+    //SAVE
     fun saveAllGestures(context: Context, commands: List<Command>) {
         try {
             val file = File(context.filesDir, GESTURE_FILE_NAME)
@@ -75,17 +89,10 @@ object GestureDataManager {
         }
     }
 
+    // CREATE
     fun addCommand(context: Context, command: Command) {
         val allCommands = loadAllGestures(context)
         allCommands.add(command)
-        saveAllGestures(context, allCommands)
-    }
-
-    // miałobyc dodawania wariatn uw edytorze ale po co to komu
-    fun addVariant(context: Context, gestureName: String, variant: Gesture) {
-        val allCommands = loadAllGestures(context)
-        val command = allCommands.find { it.name == gestureName }
-        command?.variants?.add(variant)
         saveAllGestures(context, allCommands)
     }
 
@@ -103,11 +110,7 @@ object GestureDataManager {
                 it
             }
         }
-
-        if (updated) {
-            saveAllGestures(context, newCommands)
-            Log.d("GestureDataManager", "Zaktualizowano threshold dla '$commandName' na $newThreshold")
-        }
+        if (updated) saveAllGestures(context, newCommands)
     }
 
     // Aktualizacja wariantu wewnątrz komendy
@@ -146,6 +149,7 @@ object GestureDataManager {
         }
     }
 
+    //inicjalizacja
     fun resetToDefaults(context: Context) {
         try {
             val inputStream = context.resources.openRawResource(R.raw.default_gestures)
@@ -154,7 +158,7 @@ object GestureDataManager {
             val defaultCommands: List<Command> = json.decodeFromString(content)
 
             saveAllGestures(context, defaultCommands)
-            Log.d("GestureDataManager", "Przywrócono gesty domyślne: ${defaultCommands.size} komend")
+            Log.d("GestureDataManager", "Ustawiono gesty domyślne: ${defaultCommands.size} komend")
 
         } catch (e: Exception) {
             Log.e("GestureDataManager", "Błąd resetowania do domyślnych", e)

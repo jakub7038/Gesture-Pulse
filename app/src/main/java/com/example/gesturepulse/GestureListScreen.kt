@@ -70,13 +70,26 @@ fun GestureListScreen(navController: NavController) {
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(command.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text("Warianty: ${command.variants.size}", fontSize = 12.sp, color = Color.Gray)
+
+                            val info = when(command.type) {
+                                CommandType.MOTION -> "Ruch (${command.variants.size} warianty)"
+                                CommandType.MASHING -> "Klikanie (Wymagane: ${command.threshold.toInt()})"
+                                CommandType.DONT_TAP -> "Refleks (Nie dotykać)"
+                            }
+                            Text(info, fontSize = 12.sp, color = Color.Gray)
                         }
 
-                        IconButton(onClick = {
-                            navController.navigate("editor/${command.name}")
-                        }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Ustawienia")
+                        val isEditable = command.type == CommandType.MOTION
+
+                        IconButton(
+                            onClick = { navController.navigate("editor/${command.name}") },
+                            enabled = isEditable
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Edytuj",
+                                tint = if(isEditable) MaterialTheme.colorScheme.onSurface else Color.LightGray.copy(alpha=0.5f)
+                            )
                         }
 
                         IconButton(onClick = {

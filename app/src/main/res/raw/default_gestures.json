@@ -1,5 +1,23 @@
 [
   {
+    "name": "Klikaj!",
+    "type": "MASHING",
+    "threshold": 5.0,
+    "variants": []
+  },
+  {
+    "name": "Klikaj szybko!",
+    "type": "MASHING",
+    "threshold": 12.0,
+    "variants": []
+  },
+  {
+    "name": "Nie Klikaj!",
+    "type": "DONT_TAP",
+    "threshold": 0.0,
+    "variants": []
+  },
+  {
     "name": "spin",
     "variants": [
       {
